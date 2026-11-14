@@ -1,14 +1,15 @@
 using UnityEngine;
 
-// Placeholder HUD drawn with PixelFont on the game's own pixel grid (960x540, integer upscaled).
+// In-level HUD in Ezra's font. His sheet has no digits, so the level number is spelled out
+// and bullets and targets are shown as little pips instead of numbers.
 public sealed class GameplayUI : MonoBehaviour
 {
-    const int RefWidth = 960, RefHeight = 540;
-    static readonly Color Ink = new Color(0.16f, 0.09f, 0.05f);
-    static readonly Color Paper = new Color(1f, 0.95f, 0.8f);
+    static readonly string[] Numbers = { "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+        "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty" };
+    static readonly Color BulletGold = new Color(1f, 0.82f, 0.25f);
+    static readonly Color TargetRed = new Color(0.9f, 0.2f, 0.2f);
 
     [SerializeField] LevelManager level;
-    int scale, originX, originY;
 
     void Start()
     {
@@ -18,32 +19,26 @@ public sealed class GameplayUI : MonoBehaviour
     void OnGUI()
     {
         if (level == null || Event.current.type != EventType.Repaint) return;
-        // Match the Pixel Perfect Camera: whole-number zoom, centered.
-        scale = Mathf.Max(1, Mathf.Min(Screen.width / RefWidth, Screen.height / RefHeight));
-        originX = (Screen.width - RefWidth * scale) / 2;
-        originY = (Screen.height - RefHeight * scale) / 2;
 
-        Line(8, 4, $"LEVEL {level.LevelNumber}  {level.title}  BULLETS: {level.ShotsLeft}  TARGETS: {level.TargetsRemaining}", 2);
-        Line(8, 18, "AIM WITH THE MOUSE  LEFT CLICK SHOOT  R RESTART  ESC QUIT", 2);
+        int n = level.LevelNumber;
+        string number = n >= 0 && n < Numbers.Length ? Numbers[n] : "";
+        int x = PixelUI.Text(10, 12, $"Level {number}   {level.title}", 1, PixelUI.Paper);
 
-        string center = null;
-        if (level.LevelComplete) center = level.HasNextLevel ? "BULLSEYE!" : "YOU BEAT IT!  THANKS FOR PLAYING";
-        else if (level.OutOfShots) center = "OUT OF BULLETS...";
-        if (center != null) Line((RefWidth - PixelFont.Width(center) * 4) / 2, 120, center, 4);
+        x = PixelUI.Text(x + 24, 12, "Bullets", 1, PixelUI.Paper) + 8;
+        for (int i = 0; i < level.ShotsLeft; i++, x += 7) Pip(x, 17, 4, 9, BulletGold);
+
+        x = PixelUI.Text(x + 20, 12, "Targets", 1, PixelUI.Paper) + 8;
+        for (int i = 0; i < level.TargetsRemaining; i++, x += 10) Pip(x, 18, 7, 7, TargetRed);
+
+        PixelUI.Text(10, PixelUI.RefHeight - 34, "Aim with the mouse   Click to shoot   R restarts   Esc for menu", 1, PixelUI.Paper);
+
+        if (level.LevelComplete) PixelUI.TextCentered(110, "Bullseye", 3, PixelUI.Paper);
+        else if (level.OutOfShots) PixelUI.TextCentered(110, "Out of bullets", 3, PixelUI.Paper);
     }
 
-    // x, y and size are in game pixels, measured from the top left of the 960x540 view.
-    void Line(int x, int y, string text, int size)
+    static void Pip(int x, int y, int width, int height, Color color)
     {
-        var tex = PixelFont.Texture(text);
-        if (tex == null) return;
-        int s = scale * size;
-        var rect = new Rect(originX + x * scale, originY + y * scale, tex.width * s, tex.height * s);
-        var previous = GUI.color;
-        GUI.color = Ink;
-        GUI.DrawTexture(new Rect(rect.x + s, rect.y + s, rect.width, rect.height), tex);
-        GUI.color = Paper;
-        GUI.DrawTexture(rect, tex);
-        GUI.color = previous;
+        PixelUI.Box(x + 1, y + 1, width, height, PixelUI.Ink);
+        PixelUI.Box(x, y, width, height, color);
     }
 }

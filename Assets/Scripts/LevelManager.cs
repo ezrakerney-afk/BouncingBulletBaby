@@ -2,8 +2,8 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
-// Level flow: hit every target (ricochets allowed) and the screen fades to black into the next level.
-// Out of shots with a target still up restarts the level.
+// Level flow: hit every target (ricochets allowed) and the screen fades to black into the next level
+// (the end screen follows the last level). Out of bullets with a target still up is game over.
 public sealed class LevelManager : MonoBehaviour
 {
     [SerializeField] Revolver revolver;
@@ -11,15 +11,12 @@ public sealed class LevelManager : MonoBehaviour
     [SerializeField] bool restartWhenOutOfShots = true;
     [SerializeField] float restartDelay = 0.8f;
     [SerializeField] float nextLevelDelay = 0.4f;
-    [SerializeField] float endScreenDelay = 3f;
     [SerializeField] float killY = -15f;
 
     public bool LevelComplete { get; private set; }
     public bool OutOfShots { get; private set; }
     public int ShotsLeft => revolver != null ? revolver.ShotsLeft : 0;
-    public int LevelNumber => SceneManager.GetActiveScene().buildIndex + 1;
-    public bool HasNextLevel => SceneManager.GetActiveScene().buildIndex >= 0 &&
-        SceneManager.GetActiveScene().buildIndex + 1 < SceneManager.sceneCountInBuildSettings;
+    public int LevelNumber => SceneManager.GetActiveScene().buildIndex; // the home screen is build index 0
     public int TargetsRemaining { get; private set; }
     public string title;
     float restartAt = -1f;
@@ -43,7 +40,7 @@ public sealed class LevelManager : MonoBehaviour
         if (TargetsRemaining > 0) return;
         LevelComplete = true;
         if (revolver != null) revolver.CanShoot = false;
-        nextAt = Time.time + (HasNextLevel ? nextLevelDelay : endScreenDelay);
+        nextAt = Time.time + nextLevelDelay;
     }
 
     void Update()
@@ -57,7 +54,7 @@ public sealed class LevelManager : MonoBehaviour
             if (Time.time >= nextAt && !ScreenFade.Busy)
             {
                 nextAt = float.PositiveInfinity;
-                ScreenFade.LoadScene(HasNextLevel ? SceneManager.GetActiveScene().buildIndex + 1 : 0);
+                ScreenFade.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
             }
             return;
         }
@@ -69,7 +66,12 @@ public sealed class LevelManager : MonoBehaviour
             FindFirstObjectByType<RicochetBullet>() == null)
         {
             if (restartAt < 0f) { OutOfShots = true; restartAt = Time.time + restartDelay; }
-            else if (Time.time >= restartAt) RestartLevel();
+            else if (Time.time >= restartAt)
+            {
+                restartAt = float.PositiveInfinity;
+                ScreenUI.RetryScene = SceneManager.GetActiveScene().buildIndex;
+                ScreenFade.LoadScene(ScreenUI.GameOverScene);
+            }
         }
     }
 

@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// Lives across level loads: loops the soundtrack and lets Esc quit the standalone game.
+// Lives across level loads: loops the soundtrack. Esc goes back to the home screen, or quits from there.
 public sealed class GameShell : MonoBehaviour
 {
     public AudioClip music;
@@ -24,6 +24,8 @@ public sealed class GameShell : MonoBehaviour
     void Update()
     {
         var keyboard = Keyboard.current;
-        if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame) Application.Quit();
+        if (keyboard == null || !keyboard.escapeKey.wasPressedThisFrame || ScreenFade.Busy) return;
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == ScreenUI.MenuScene) Application.Quit();
+        else ScreenFade.LoadScene(ScreenUI.MenuScene);
     }
 }

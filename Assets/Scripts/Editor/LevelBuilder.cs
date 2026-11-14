@@ -50,15 +50,19 @@ public static class LevelBuilder
         var levels = Levels();
         var scenes = new List<EditorBuildSettingsScene>();
         Directory.CreateDirectory(SceneDir);
+        // Build order: home screen (index 0), the levels, then the end screen and the game over screen.
+        scenes.Add(BuildScreen(ScreenUI.Kind.Menu, ScreenUI.MenuScene));
         for (int i = 0; i < levels.Count; i++)
         {
             string path = $"{SceneDir}/Level{i + 1:00}.unity";
             BuildScene(levels[i], path, i);
             scenes.Add(new EditorBuildSettingsScene(path, true));
         }
+        scenes.Add(BuildScreen(ScreenUI.Kind.End, ScreenUI.EndScene));
+        scenes.Add(BuildScreen(ScreenUI.Kind.GameOver, ScreenUI.GameOverScene));
         EditorBuildSettings.scenes = scenes.ToArray();
         AssetDatabase.SaveAssets();
-        if (levels.Count > 0) EditorSceneManager.OpenScene($"{SceneDir}/Level01.unity");
+        EditorSceneManager.OpenScene($"Assets/Scenes/{ScreenUI.MenuScene}.unity");
         Debug.Log($"LevelBuilder: built {levels.Count} levels");
     }
 
@@ -100,10 +104,26 @@ public static class LevelBuilder
         return list;
     }
 
-    static void BuildScene(Level lv, string path, int index)
+    // Home, game over and end screens: the same camera and background as the levels, plus ScreenUI.
+    static EditorBuildSettingsScene BuildScreen(ScreenUI.Kind kind, string sceneName)
     {
+        string path = $"Assets/Scenes/{sceneName}.unity";
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        BuildCamera();
+        BuildBackground();
+        var go = new GameObject("Screen");
+        var ui = go.AddComponent<ScreenUI>();
+        ui.kind = kind;
+        ui.face = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Art/UI/face.png");
+        ui.playButton = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Art/UI/play.png");
+        ui.exitButton = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Art/UI/exit.png");
+        go.AddComponent<GameShell>().music = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/soundtrack.ogg");
+        EditorSceneManager.SaveScene(scene, path);
+        return new EditorBuildSettingsScene(path, true);
+    }
 
+    static Camera BuildCamera()
+    {
         var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
         var cam = camGo.AddComponent<Camera>();
         cam.orthographic = true; cam.orthographicSize = 9.6f;
@@ -115,14 +135,23 @@ public static class LevelBuilder
         pixelCamera.refResolutionY = 540;
         pixelCamera.gridSnapping = PixelPerfectCamera.GridSnapping.UpscaleRenderTexture;
         Set(pixelCamera, "m_FilterMode", (int)PixelPerfectCamera.PixelPerfectFilterMode.Point);
+        return cam;
+    }
 
-        // Background: Assets/Art/background.png sits behind everything in every level.
+    // Background: Assets/Art/background.png sits behind everything in every level and screen.
+    static void BuildBackground()
+    {
         var backgroundArt = Art("background");
-        if (backgroundArt != null)
-        {
-            var bg = Sprite("Background", null, Vector2.zero, Vector2.one, Color.white, backgroundArt);
-            bg.GetComponent<SpriteRenderer>().sortingOrder = -100;
-        }
+        if (backgroundArt == null) return;
+        var bg = Sprite("Background", null, Vector2.zero, Vector2.one, Color.white, backgroundArt);
+        bg.GetComponent<SpriteRenderer>().sortingOrder = -100;
+    }
+
+    static void BuildScene(Level lv, string path, int index)
+    {
+        var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        var cam = BuildCamera();
+        BuildBackground();
 
         BuildWalls(lv);
 
@@ -168,7 +197,7 @@ public static class LevelBuilder
 
         var mgr = new GameObject("LevelManager");
         var manager = mgr.AddComponent<LevelManager>();
-        manager.title = lv.name.ToUpperInvariant();
+        manager.title = lv.name;
         mgr.AddComponent<GameplayUI>();
         var shell = mgr.AddComponent<GameShell>();
         shell.music = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/soundtrack.ogg");
@@ -293,7 +322,7 @@ public static class LevelBuilder
         go.AddComponent<RicochetBullet>();
         var look = new GameObject("Pixel"); look.transform.SetParent(go.transform, false);
         var sr = look.AddComponent<SpriteRenderer>(); sr.sprite = pixel; sr.sharedMaterial = unlit; sr.sortingOrder = 8;
-        sr.color = Art("bullet") != null ? Color.white : new Color(0.2f, 0.13f, 0.1f);
+        sr.color = Art("bullet") != null ? Color.white : new Color(1f, 0.93f, 0.6f);
         if (Art("bullet") != null) sr.sprite = Art("bullet");
         look.AddComponent<PixelSnap>().pixelsPerUnit = PixelsPerUnit;
         bulletPrefab = PrefabUtility.SaveAsPrefabAsset(go, BulletPath).GetComponent<RicochetBullet>();

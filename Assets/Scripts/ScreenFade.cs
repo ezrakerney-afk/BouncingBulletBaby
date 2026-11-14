@@ -12,7 +12,10 @@ public sealed class ScreenFade : MonoBehaviour
 
     public static bool Busy => instance != null && instance.busy;
 
-    public static void LoadScene(int buildIndex)
+    public static void LoadScene(int buildIndex) => Begin(() => SceneManager.LoadScene(buildIndex));
+    public static void LoadScene(string sceneName) => Begin(() => SceneManager.LoadScene(sceneName));
+
+    static void Begin(System.Action load)
     {
         if (instance == null)
         {
@@ -20,10 +23,10 @@ public sealed class ScreenFade : MonoBehaviour
             DontDestroyOnLoad(go);
             instance = go.AddComponent<ScreenFade>();
         }
-        if (!instance.busy) instance.StartCoroutine(instance.Run(buildIndex));
+        if (!instance.busy) instance.StartCoroutine(instance.Run(load));
     }
 
-    IEnumerator Run(int buildIndex)
+    IEnumerator Run(System.Action load)
     {
         busy = true;
         for (float t = 0f; t < FadeTime; t += Time.unscaledDeltaTime)
@@ -33,7 +36,7 @@ public sealed class ScreenFade : MonoBehaviour
         }
         alpha = 1f;
         yield return null;
-        SceneManager.LoadScene(buildIndex);
+        load();
         yield return null;
         yield return null;
         busy = false;
