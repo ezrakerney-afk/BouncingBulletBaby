@@ -45,6 +45,7 @@ public sealed class Revolver : MonoBehaviour
         nextShot = Time.time + shotInterval;
         onShotsChanged.Invoke(ShotsLeft);
         onFired.Invoke();
+        GameShell.PlayGunshot();
         return true;
     }
 

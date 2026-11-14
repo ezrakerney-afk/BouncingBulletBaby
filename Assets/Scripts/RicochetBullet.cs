@@ -55,6 +55,7 @@ public sealed class RicochetBullet : MonoBehaviour
             direction = Vector2.Reflect(direction, normal).normalized;
         body.linearVelocity = direction * speed;
         bounces++;
+        GameShell.PlayWallHit();
     }
 
     void OnTriggerEnter2D(Collider2D other)

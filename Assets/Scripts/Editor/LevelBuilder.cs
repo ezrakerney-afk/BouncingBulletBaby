@@ -119,9 +119,18 @@ public static class LevelBuilder
         ui.face = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Art/UI/face.png");
         ui.playButton = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Art/UI/play.png");
         ui.exitButton = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Art/UI/exit.png");
-        go.AddComponent<GameShell>().music = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/soundtrack.ogg");
+        AddShell(go);
         EditorSceneManager.SaveScene(scene, path);
         return new EditorBuildSettingsScene(path, true);
+    }
+
+    // Music and sound effects: every scene carries the clips so the game works from any starting scene.
+    static void AddShell(GameObject go)
+    {
+        var shell = go.AddComponent<GameShell>();
+        shell.music = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/soundtrack.ogg");
+        shell.gunshot = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/gunshot.ogg");
+        shell.wallHit = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/wall-hit.ogg");
     }
 
     static Camera BuildCamera()
@@ -201,8 +210,7 @@ public static class LevelBuilder
         var manager = mgr.AddComponent<LevelManager>();
         manager.title = lv.name;
         mgr.AddComponent<GameplayUI>();
-        var shell = mgr.AddComponent<GameShell>();
-        shell.music = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/soundtrack.ogg");
+        AddShell(mgr);
 
         EditorSceneManager.SaveScene(scene, path);
     }
@@ -221,10 +229,17 @@ public static class LevelBuilder
             {
                 if (!lv.solid[col, row]) continue;
                 // Which sides of this tile face open air: top = 1, right = 2, bottom = 4, left = 8.
-                // Assets/Art/Tiles/tile_<mask>.png holds the matching piece, already rotated to fit.
-                int mask = (Solid(lv, col, row - 1) ? 0 : 1) | (Solid(lv, col + 1, row) ? 0 : 2)
-                         | (Solid(lv, col, row + 1) ? 0 : 4) | (Solid(lv, col - 1, row) ? 0 : 8);
-                var tileArt = Art($"Tiles/tile_{mask}");
+                bool top = !Solid(lv, col, row - 1), right = !Solid(lv, col + 1, row);
+                bool bottom = !Solid(lv, col, row + 1), left = !Solid(lv, col - 1, row);
+                int sides = (top ? 1 : 0) | (right ? 2 : 0) | (bottom ? 4 : 0) | (left ? 8 : 0);
+                // Inside corners: a diagonal neighbour is open while both sides next to it are solid.
+                // top-right = 1, bottom-right = 2, bottom-left = 4, top-left = 8.
+                int inner = (!top && !right && !Solid(lv, col + 1, row - 1) ? 1 : 0)
+                          | (!right && !bottom && !Solid(lv, col + 1, row + 1) ? 2 : 0)
+                          | (!bottom && !left && !Solid(lv, col - 1, row + 1) ? 4 : 0)
+                          | (!left && !top && !Solid(lv, col - 1, row - 1) ? 8 : 0);
+                // Assets/Art/Tiles/tile_<sides>_<inner>.png holds the matching piece, already rotated to fit.
+                var tileArt = Art($"Tiles/tile_{sides}_{inner}");
                 var t = Sprite($"Tile {col},{row}", walls.transform, Cell(col, row), Vector2.one,
                     tileArt != null ? Color.white : WallSand, tileArt != null ? tileArt : tile);
                 t.GetComponent<SpriteRenderer>().sortingOrder = 1;
@@ -332,7 +347,7 @@ public static class LevelBuilder
         go.AddComponent<RicochetBullet>();
         var look = new GameObject("Pixel"); look.transform.SetParent(go.transform, false);
         var sr = look.AddComponent<SpriteRenderer>(); sr.sprite = pixel; sr.sharedMaterial = unlit; sr.sortingOrder = 8;
-        sr.color = Art("bullet") != null ? Color.white : new Color(1f, 0.93f, 0.6f);
+        sr.color = Art("bullet") != null ? Color.white : new Color(0.16f, 0.09f, 0.05f);
         if (Art("bullet") != null) sr.sprite = Art("bullet");
         look.AddComponent<PixelSnap>().pixelsPerUnit = PixelsPerUnit;
         bulletPrefab = PrefabUtility.SaveAsPrefabAsset(go, BulletPath).GetComponent<RicochetBullet>();

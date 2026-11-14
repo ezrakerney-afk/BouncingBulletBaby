@@ -13,6 +13,7 @@ public sealed class ScreenUI : MonoBehaviour
     // Level to go back to when Play is pressed on the game over screen.
     public static int RetryScene = FirstLevel;
 
+    int lastHovered;
     public Kind kind;
     public Texture2D face, playButton, exitButton;
 
@@ -41,8 +42,14 @@ public sealed class ScreenUI : MonoBehaviour
         var keyboard = Keyboard.current;
         bool click = mouse != null && mouse.leftButton.wasPressedThisFrame;
         bool enter = keyboard != null && (keyboard.enterKey.wasPressedThisFrame || keyboard.spaceKey.wasPressedThisFrame);
-        if (enter || (click && Hover(PlayBox))) Play();
-        else if (click && Hover(ExitBox)) Exit();
+
+        // Moving onto a button plays the wall-hit sound once; pressing a button plays the gunshot.
+        int hovered = Hover(PlayBox) ? 1 : Hover(ExitBox) ? 2 : 0;
+        if (hovered != 0 && hovered != lastHovered) GameShell.PlayWallHit();
+        lastHovered = hovered;
+
+        if (enter || (click && hovered == 1)) { GameShell.PlayGunshot(); Play(); }
+        else if (click && hovered == 2) { GameShell.PlayGunshot(); Exit(); }
     }
 
     void Play()
