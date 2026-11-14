@@ -2,56 +2,69 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
-// Level flow: hit every target (ricochets allowed) and the screen fades to black into the next level
-// (the end screen follows the last level). Out of bullets with a target still up is game over.
+// Hit every target to clear the level. Running dry with a target still up is game over.
 public sealed class LevelManager : MonoBehaviour
 {
     [SerializeField] Revolver revolver;
-    [SerializeField] BabyController baby;
-    [SerializeField] bool restartWhenOutOfShots = true;
-    [SerializeField] float restartDelay = 0.8f;
-    [SerializeField] float nextLevelDelay = 0.4f;
-    [SerializeField] float killY = -15f;
+    [SerializeField] float gameOverDelay = 0.8f;
+    [SerializeField] float nextLevelDelay = 1f;
+    [SerializeField] float bannerTime = 0.9f;
 
-    public bool LevelComplete { get; private set; }
-    public bool OutOfShots { get; private set; }
-    public int ShotsLeft => revolver != null ? revolver.ShotsLeft : 0;
-    public int LevelNumber => SceneManager.GetActiveScene().buildIndex; // the home screen is build index 0
-    public int TargetsRemaining { get; private set; }
     public string title;
-    float restartAt = -1f;
-    float nextAt = -1f;
+    public bool LevelComplete { get; private set; }
+    public int TargetsRemaining { get; private set; }
+    public int ShotsLeft => revolver != null ? revolver.ShotsLeft : 0;
+    public int LevelNumber => SceneManager.GetActiveScene().buildIndex; // menu is scene 0
+
+    // "Bullseye" on a hit, "Perfect" when the level is cleared without a wasted bullet.
+    public string Banner => Time.time < bannerUntil ? banner : null;
+
+    string banner;
+    float bannerUntil;
+    int targetCount, startingShots;
+    float gameOverAt = -1f, nextAt = -1f;
 
     void Awake()
     {
         if (revolver == null) revolver = FindFirstObjectByType<Revolver>();
-        if (baby == null) baby = FindFirstObjectByType<BabyController>();
-        var targets = FindObjectsByType<Target>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        foreach (var t in targets) if (t.gameObject.scene == gameObject.scene) TargetsRemaining++;
+        foreach (var t in FindObjectsByType<Target>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            if (t.gameObject.scene == gameObject.scene) targetCount++;
+        TargetsRemaining = targetCount;
     }
 
-    void OnEnable() { Target.OnHit += HandleTargetHit; }
-    void OnDisable() { Target.OnHit -= HandleTargetHit; }
+    void Start() => startingShots = ShotsLeft;
 
-    void HandleTargetHit(Target hit)
+    void OnEnable() => Target.OnHit += OnTargetHit;
+    void OnDisable() => Target.OnHit -= OnTargetHit;
+
+    void OnTargetHit(Target hit)
     {
         if (LevelComplete || hit.gameObject.scene != gameObject.scene) return;
         TargetsRemaining--;
+        banner = "Bullseye";
+        bannerUntil = Time.time + bannerTime;
         if (TargetsRemaining > 0) return;
+
         LevelComplete = true;
         if (revolver != null) revolver.CanShoot = false;
+        if (startingShots - ShotsLeft == targetCount) banner = "Perfect";
+        bannerUntil = Time.time + nextLevelDelay + 1f;
         nextAt = Time.time + nextLevelDelay;
     }
 
     void Update()
     {
-        var keyboard = Keyboard.current;
         if (ScreenFade.Busy) return;
-        if (keyboard != null && keyboard.rKey.wasPressedThisFrame) { RestartLevel(); return; }
+        var keyboard = Keyboard.current;
+        if (keyboard != null && keyboard.rKey.wasPressedThisFrame)
+        {
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            return;
+        }
 
         if (LevelComplete)
         {
-            if (Time.time >= nextAt && !ScreenFade.Busy)
+            if (Time.time >= nextAt)
             {
                 nextAt = float.PositiveInfinity;
                 ScreenFade.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
@@ -59,21 +72,14 @@ public sealed class LevelManager : MonoBehaviour
             return;
         }
 
-        if (baby != null && baby.transform.position.y < killY) RestartLevel();
-
-        // The last bullet must finish its ricochets before declaring failure.
-        if (restartWhenOutOfShots && revolver != null && ShotsLeft == 0 &&
-            FindFirstObjectByType<RicochetBullet>() == null)
+        // wait for the last bullet to stop bouncing before calling it
+        if (ShotsLeft > 0 || FindFirstObjectByType<RicochetBullet>() != null) return;
+        if (gameOverAt < 0f) gameOverAt = Time.time + gameOverDelay;
+        else if (Time.time >= gameOverAt)
         {
-            if (restartAt < 0f) { OutOfShots = true; restartAt = Time.time + restartDelay; }
-            else if (Time.time >= restartAt)
-            {
-                restartAt = float.PositiveInfinity;
-                ScreenUI.RetryScene = SceneManager.GetActiveScene().buildIndex;
-                ScreenFade.LoadScene(ScreenUI.GameOverScene);
-            }
+            gameOverAt = float.PositiveInfinity;
+            ScreenUI.RetryScene = SceneManager.GetActiveScene().buildIndex;
+            ScreenFade.LoadScene(ScreenUI.GameOverScene);
         }
     }
-
-    public void RestartLevel() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
 }

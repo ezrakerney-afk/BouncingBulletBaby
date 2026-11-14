@@ -1,7 +1,6 @@
 using UnityEngine;
 
-// Flies in a straight line and reflects off walls. Every wall sits on the tile grid,
-// so the bounce normal is squared to the nearest axis for clean, predictable ricochets.
+// Straight-line bullet that reflects off walls. Normals are snapped to an axis since walls are on the grid.
 [RequireComponent(typeof(Rigidbody2D), typeof(Collider2D))]
 public sealed class RicochetBullet : MonoBehaviour
 {
@@ -50,7 +49,7 @@ public sealed class RicochetBullet : MonoBehaviour
         normal = Mathf.Abs(normal.x) > Mathf.Abs(normal.y)
             ? new Vector2(Mathf.Sign(normal.x), 0f)
             : new Vector2(0f, Mathf.Sign(normal.y));
-        // Only bounce off a face the bullet is actually flying into.
+        // ignore faces we're moving away from
         if (Vector2.Dot(direction, normal) < 0f)
             direction = Vector2.Reflect(direction, normal).normalized;
         body.linearVelocity = direction * speed;

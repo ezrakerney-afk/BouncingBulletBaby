@@ -1,8 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Draws text with Ezra's hand-drawn pixel alphabet (PixelFontData) so every word in the game uses his font.
-// The sheet has letters only, so anything else (digits, punctuation) is left as a gap.
+// Bitmap text from PixelFontData. Letters only, anything else is a gap.
 public static class PixelFont
 {
     public const int Spacing = 2, SpaceWidth = 5;
@@ -19,7 +18,6 @@ public static class PixelFont
         return Mathf.Max(1, width - Spacing);
     }
 
-    // White-on-clear texture of the text, one texel per font pixel. Cached per string.
     public static Texture2D Texture(string text)
     {
         if (string.IsNullOrEmpty(text)) return null;

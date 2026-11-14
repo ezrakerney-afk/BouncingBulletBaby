@@ -2,14 +2,14 @@
 using UnityEditor;
 using UnityEngine;
 
-// Any image dropped under Assets/Art imports as crisp pixel art: 32 px per unit, no smoothing, no compression.
+// Everything under Assets/Art imports as pixel art: 32 ppu, point filter, uncompressed.
 public sealed class PixelArtImporter : AssetPostprocessor
 {
     void OnPreprocessTexture()
     {
         if (!assetPath.StartsWith("Assets/Art/")) return;
         var imp = (TextureImporter)assetImporter;
-        // Only choose the sprite mode on first import, so a sheet sliced by hand later stays sliced.
+        // only on first import so hand-sliced sheets stay sliced
         if (imp.importSettingsMissing)
         {
             imp.textureType = TextureImporterType.Sprite;

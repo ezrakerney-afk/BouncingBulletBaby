@@ -1,8 +1,6 @@
 using System.Collections.Generic;
 
-// Ezra's hand-drawn pixel alphabet, traced from his font sheet (A-Z and a-z, one entry per letter).
-// Every glyph is 21 rows tall (top row first) so letters share one baseline; widths vary per letter.
-// Generated from the sheet, so redraw the sheet and regenerate rather than editing by hand.
+// Hand-drawn alphabet traced from the font sheet. 21 rows per glyph, top row first.
 public static class PixelFontData
 {
     public const int Height = 21;

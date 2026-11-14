@@ -1,7 +1,6 @@
 using UnityEngine;
 
-// Shared drawing helpers for the HUD and the menu screens. Everything is placed in game pixels
-// on the 960x540 view and scaled by the same whole number as the Pixel Perfect Camera.
+// HUD/menu drawing in game pixels (960x540), scaled like the pixel perfect camera.
 public static class PixelUI
 {
     public const int RefWidth = 960, RefHeight = 540;
@@ -12,7 +11,6 @@ public static class PixelUI
     static int OriginX => (Screen.width - RefWidth * Scale) / 2;
     static int OriginY => (Screen.height - RefHeight * Scale) / 2;
 
-    // Screen rectangle (GUI space, y down) for a box given in game pixels from the top left of the view.
     public static Rect ToScreen(float x, float y, float width, float height)
     {
         int s = Scale;
@@ -21,7 +19,6 @@ public static class PixelUI
 
     public static int TextWidth(string text, int size) => PixelFont.Width(text) * size;
 
-    // Text, with a one-pixel drop shadow unless shadow is false (plain dark text on a white screen). Returns the x just past the text, in game pixels.
     public static int Text(int x, int y, string text, int size, Color color, bool shadow = true)
     {
         var tex = PixelFont.Texture(text);

@@ -49,8 +49,6 @@ public sealed class Revolver : MonoBehaviour
         return true;
     }
 
-    // The bullet starts at the muzzle, unless a wall sits between the gun and the muzzle:
-    // then it starts at the gun itself so it can never spawn inside a wall.
     Vector2 SpawnPoint()
     {
         if (muzzle == null) return transform.position;

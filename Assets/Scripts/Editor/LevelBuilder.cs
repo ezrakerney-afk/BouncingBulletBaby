@@ -6,18 +6,15 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
 
-// Builds every level scene from the tile maps in Assets/Levels so nobody hand-edits .unity files.
-// Menu: Bouncing Bullet Baby > Build Levels. Batch: -executeMethod LevelBuilder.BuildAll
+// Builds all scenes from the maps in Assets/Levels. Batch: -executeMethod LevelBuilder.BuildAll
 public static class LevelBuilder
 {
     const string ArtDir = "Assets/Art/Placeholder";
     const string SceneDir = "Assets/Scenes/Levels";
     const string BulletPath = "Assets/Prefabs/Bullet.prefab";
-    // One pixel of Ezra's art is one game pixel: 32 px per unit, 960x540 view (2x on a 1080p screen).
     const int PixelsPerUnit = 32;
 
     static readonly Color Sand = new Color(0.93f, 0.80f, 0.56f);
-    // Every surface is sand colored until the real tiles arrive; a touch deeper than the background sand so walls read.
     static readonly Color WallSand = new Color(0.90f, 0.75f, 0.50f);
     static readonly Color BabyCol = new Color(1f, 0.85f, 0.75f);
     static readonly Color TargetCol = new Color(0.9f, 0.12f, 0.12f);
@@ -28,8 +25,6 @@ public static class LevelBuilder
     static RicochetBullet bulletPrefab;
 
     const string LevelDir = "Assets/Levels";
-    // Every level is a 30 x 18 tile map (one tile = one unit = 32 px). Tile (col, row) has its
-    // centre at x = col - 14.5, y = 8.5 - row, so the outer ring of wall tiles frames the 960x540 view.
     const int Cols = 30, Rows = 18;
 
     struct Level
@@ -37,7 +32,7 @@ public static class LevelBuilder
         public string name;
         public int shots;
         public bool[,] solid;      // [col, row]
-        public Vector2 baby;       // centre of the tile the baby's feet stand in (same tile in every level)
+        public Vector2 baby;       // feet tile
         public List<Vector2> targets;
     }
 
@@ -50,7 +45,7 @@ public static class LevelBuilder
         var levels = Levels();
         var scenes = new List<EditorBuildSettingsScene>();
         Directory.CreateDirectory(SceneDir);
-        // Build order: home screen (index 0), the levels, then the end screen and the game over screen.
+        // menu first, then levels, end, game over
         scenes.Add(BuildScreen(ScreenUI.Kind.Menu, ScreenUI.MenuScene));
         for (int i = 0; i < levels.Count; i++)
         {
@@ -66,8 +61,8 @@ public static class LevelBuilder
         Debug.Log($"LevelBuilder: built {levels.Count} levels");
     }
 
-    // Level files: Assets/Levels/Level01.txt ... First line "NAME|SHOTS", then 18 rows of 30 characters:
-    // '#' wall tile, '.' empty, 'B' baby start, 'T' target. tools/levels.py checks they can be beaten.
+    // level file: first line NAME|SHOTS, then 18 rows of 30 chars
+    // # wall, . empty, B baby, T target (tools/levels.py checks they're beatable)
     static List<Level> Levels()
     {
         var list = new List<Level>();
@@ -104,13 +99,11 @@ public static class LevelBuilder
         return list;
     }
 
-    // Home, game over and end screens: the same camera and background as the levels, plus ScreenUI.
     static EditorBuildSettingsScene BuildScreen(ScreenUI.Kind kind, string sceneName)
     {
         string path = $"Assets/Scenes/{sceneName}.unity";
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
         var cam = BuildCamera();
-        // The home screen is plain white; game over and the end screen keep the game background.
         if (kind == ScreenUI.Kind.Menu) cam.backgroundColor = Color.white;
         else BuildBackground();
         var go = new GameObject("Screen");
@@ -124,7 +117,6 @@ public static class LevelBuilder
         return new EditorBuildSettingsScene(path, true);
     }
 
-    // Music and sound effects: every scene carries the clips so the game works from any starting scene.
     static void AddShell(GameObject go)
     {
         var shell = go.AddComponent<GameShell>();
@@ -150,7 +142,6 @@ public static class LevelBuilder
         return cam;
     }
 
-    // Background: Assets/Art/background.png sits behind everything in every level and screen.
     static void BuildBackground()
     {
         var backgroundArt = Art("background");
@@ -167,18 +158,14 @@ public static class LevelBuilder
 
         BuildWalls(lv);
 
-        // Baby + revolver
         var babyFrames = BabyFrames();
         bool hasBabyArt = babyFrames != null;
-        // The baby sprite is 2x2 units with the feet on its bottom edge, so its centre is half a unit above the feet tile's centre.
         var baby = Sprite("Baby", null, lv.baby + Vector2.up * 0.5f, Vector2.one, hasBabyArt ? Color.white : BabyCol, hasBabyArt ? babyFrames[0] : square);
         baby.GetComponent<SpriteRenderer>().sortingOrder = 10;
-        // The baby stands in the same spot all game and never moves, so it needs no physics.
 
         var gun = new GameObject("Revolver"); gun.transform.SetParent(baby.transform, false);
         if (hasBabyArt)
         {
-            // The gun is drawn into the baby frames, so the frame follows the aim instead of a rotating barrel.
             var aim = baby.AddComponent<BabyAimSprite>();
             aim.body = baby.GetComponent<SpriteRenderer>(); aim.gun = gun.transform;
             aim.frames = babyFrames; aim.angles = new float[] { 0, 20, 30, 40, 55, 70, 85, 90 };
@@ -188,13 +175,12 @@ public static class LevelBuilder
             var barrel = Sprite("Barrel", gun.transform, new Vector2(0.55f, 0), new Vector2(0.6f, 0.18f), new Color(0.2f, 0.2f, 0.22f), square);
             barrel.GetComponent<SpriteRenderer>().sortingOrder = 11;
         }
-        // 0.7 units matches MUZZLE in tools/levels.py.
+        // keep in sync with MUZZLE in tools/levels.py
         var muzzle = new GameObject("Muzzle"); muzzle.transform.SetParent(gun.transform, false); muzzle.transform.localPosition = new Vector3(0.7f, 0, 0);
         var rev = gun.AddComponent<Revolver>();
         Set(rev, "bulletPrefab", bulletPrefab); Set(rev, "muzzle", muzzle.transform); Set(rev, "owner", baby.transform); Set(rev, "aimCamera", cam);
         Set(rev, "capacity", lv.shots > 0 ? lv.shots : 6);
 
-        // Targets
         var targetArt = Art("target");
         for (int j = 0; j < lv.targets.Count; j++)
         {
@@ -216,12 +202,9 @@ public static class LevelBuilder
         EditorSceneManager.SaveScene(scene, path);
     }
 
-    // Tiles outside the map count as solid so the outer ring only shows its inner face.
     static bool Solid(Level lv, int col, int row) =>
         col < 0 || row < 0 || col >= Cols || row >= Rows || lv.solid[col, row];
 
-    // One sprite per wall tile, picked by which neighbours are solid, and one box collider
-    // per merged rectangle of tiles so bullets and the baby never catch on seams between tiles.
     static void BuildWalls(Level lv)
     {
         var walls = new GameObject("Walls");
@@ -229,17 +212,15 @@ public static class LevelBuilder
             for (int col = 0; col < Cols; col++)
             {
                 if (!lv.solid[col, row]) continue;
-                // Which sides of this tile face open air: top = 1, right = 2, bottom = 4, left = 8.
+                // open sides: top 1, right 2, bottom 4, left 8
                 bool top = !Solid(lv, col, row - 1), right = !Solid(lv, col + 1, row);
                 bool bottom = !Solid(lv, col, row + 1), left = !Solid(lv, col - 1, row);
                 int sides = (top ? 1 : 0) | (right ? 2 : 0) | (bottom ? 4 : 0) | (left ? 8 : 0);
-                // Inside corners: a diagonal neighbour is open while both sides next to it are solid.
-                // top-right = 1, bottom-right = 2, bottom-left = 4, top-left = 8.
+                // inside corners: TR 1, BR 2, BL 4, TL 8
                 int inner = (!top && !right && !Solid(lv, col + 1, row - 1) ? 1 : 0)
                           | (!right && !bottom && !Solid(lv, col + 1, row + 1) ? 2 : 0)
                           | (!bottom && !left && !Solid(lv, col - 1, row + 1) ? 4 : 0)
                           | (!left && !top && !Solid(lv, col - 1, row - 1) ? 8 : 0);
-                // Assets/Art/Tiles/tile_<sides>_<inner>.png holds the matching piece, already rotated to fit.
                 var tileArt = Art($"Tiles/tile_{sides}_{inner}");
                 var t = Sprite($"Tile {col},{row}", walls.transform, Cell(col, row), Vector2.one,
                     tileArt != null ? Color.white : WallSand, tileArt != null ? tileArt : tile);
@@ -270,7 +251,7 @@ public static class LevelBuilder
                 box.offset = new Vector2(col - 15f + w / 2f, 9f - row - h / 2f);
             }
 
-        // Thick backstops outside the view so nothing can ever leave the room.
+        // backstops outside the view
         foreach (var (center, size) in new[] {
             (new Vector2(0, -11), new Vector2(40, 4)), (new Vector2(0, 11), new Vector2(40, 4)),
             (new Vector2(-17, 0), new Vector2(4, 26)), (new Vector2(17, 0), new Vector2(4, 26)) })
@@ -284,7 +265,6 @@ public static class LevelBuilder
     {
         var go = new GameObject(name);
         if (parent != null) go.transform.SetParent(parent, false);
-        // Everything sits on the pixel grid: positions and sizes are whole game pixels.
         go.transform.localPosition = new Vector3(Snap(pos.x), Snap(pos.y), 0);
         go.transform.localScale = new Vector3(Mathf.Max(Pixel, Snap(size.x)), Mathf.Max(Pixel, Snap(size.y)), 1);
         var sr = go.AddComponent<SpriteRenderer>();
@@ -296,7 +276,6 @@ public static class LevelBuilder
     static float Snap(float v) => Mathf.Round(v * PixelsPerUnit) / PixelsPerUnit;
     static Sprite Art(string name) => AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Art/{name}.png");
 
-    // Assets/Art/Baby/baby_aim0.png (gun level) up to baby_aim7.png (gun straight up). Null until all eight exist.
     static Sprite[] BabyFrames()
     {
         var frames = new Sprite[8];
@@ -340,8 +319,6 @@ public static class LevelBuilder
         slick = AssetDatabase.LoadAssetAtPath<PhysicsMaterial2D>(physPath);
         if (slick == null) { slick = new PhysicsMaterial2D("Slick") { friction = 0f, bounciness = 0f }; AssetDatabase.CreateAsset(slick, physPath); }
 
-        // The bullet is a 4x4 px square. Its physics body moves smoothly; the visible square is a child
-        // that PixelSnap keeps on the same pixel grid as everything else, with a short square-pixel trail.
         var go = new GameObject("Bullet");
         var body = go.AddComponent<Rigidbody2D>(); body.gravityScale = 0;
         var cc = go.AddComponent<CircleCollider2D>(); cc.radius = 2f / PixelsPerUnit; cc.sharedMaterial = slick;
@@ -355,10 +332,9 @@ public static class LevelBuilder
         Object.DestroyImmediate(go);
     }
 
-    // kind 0 = solid square, 1 = disc, 2 = wall tile with a darker 1 px edge, 3 = 4x4 px bullet.
+    // kind: 0 square, 1 disc, 2 tile, 3 bullet
     static Sprite MakeSprite(string path, int kind)
     {
-        // Regenerate our owned placeholders every build so old sizes migrate too.
         {
             int s = kind == 3 ? 4 : PixelsPerUnit;
             var tex = new Texture2D(s, s, TextureFormat.RGBA32, false);
@@ -382,7 +358,6 @@ public static class LevelBuilder
             || imp.mipmapEnabled)
         {
             imp.textureType = TextureImporterType.Sprite;
-            // Single mode: a stale Multiple-mode sheet from the old 64px texture leaves square_0 outside the 16px texture, so nothing renders.
             imp.spriteImportMode = SpriteImportMode.Single;
             imp.spritePixelsPerUnit = PixelsPerUnit;
             imp.filterMode = FilterMode.Point;

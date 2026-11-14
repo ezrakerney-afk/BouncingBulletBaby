@@ -1,23 +1,21 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// The three full screens around the levels: home (play button), game over, and the end screen.
-// Play and Exit are Ezra's button art; click them, or press Enter for Play.
+// Menu, game over and end screens.
 public sealed class ScreenUI : MonoBehaviour
 {
     public enum Kind { Menu, GameOver, End }
     public const string MenuScene = "Menu", GameOverScene = "GameOver", EndScene = "End";
-    const int FirstLevel = 1; // build index of Level01; the menu is index 0
+    const int FirstLevel = 1; // menu is scene 0
     const int ButtonSize = 6, FaceSize = 4;
 
-    // Level to go back to when Play is pressed on the game over screen.
     public static int RetryScene = FirstLevel;
 
     int lastHovered;
     public Kind kind;
     public Texture2D face, playButton, exitButton;
 
-    Rect PlayBox => ButtonBox(playButton, kind == Kind.Menu ? 356 : 380);
+    Rect PlayBox => ButtonBox(playButton, kind == Kind.Menu ? 356 : 386);
     Rect ExitBox => ButtonBox(exitButton, kind == Kind.Menu ? 418 : 442);
 
     static Rect ButtonBox(Texture2D tex, int y)
@@ -31,7 +29,7 @@ public sealed class ScreenUI : MonoBehaviour
         var mouse = Mouse.current;
         if (mouse == null) return false;
         Vector2 p = mouse.position.ReadValue();
-        p.y = Screen.height - p.y; // GUI space has y pointing down
+        p.y = Screen.height - p.y; // gui y is down
         return PixelUI.ToScreen(box.x, box.y, box.width, box.height).Contains(p);
     }
 
@@ -43,7 +41,6 @@ public sealed class ScreenUI : MonoBehaviour
         bool click = mouse != null && mouse.leftButton.wasPressedThisFrame;
         bool enter = keyboard != null && (keyboard.enterKey.wasPressedThisFrame || keyboard.spaceKey.wasPressedThisFrame);
 
-        // Moving onto a button plays the wall-hit sound once; pressing a button plays the gunshot.
         int hovered = Hover(PlayBox) ? 1 : Hover(ExitBox) ? 2 : 0;
         if (hovered != 0 && hovered != lastHovered) GameShell.PlayWallHit();
         lastHovered = hovered;
@@ -60,7 +57,6 @@ public sealed class ScreenUI : MonoBehaviour
 
     void Exit()
     {
-        // On the home screen Exit closes the game; on the other screens it goes back home.
         if (kind == Kind.Menu) Application.Quit();
         else ScreenFade.LoadScene(MenuScene);
     }
@@ -74,7 +70,6 @@ public sealed class ScreenUI : MonoBehaviour
 
         if (kind == Kind.Menu)
         {
-            // The home screen is plain white, so its text is dark ink with no shadow.
             PixelUI.TextCentered(22, "Bouncing Bullet Baby", 3, PixelUI.Ink, false);
             PixelUI.Image(face, faceX, 104, FaceSize, Color.white);
             PixelUI.TextCentered(280, "Bank your shots off the walls", 2, PixelUI.Ink, false);
@@ -87,10 +82,11 @@ public sealed class ScreenUI : MonoBehaviour
         }
         else
         {
-            PixelUI.TextCentered(16, "You beat it", 4, paper);
-            PixelUI.Image(face, faceX, 108, FaceSize, Color.white);
-            PixelUI.TextCentered(274, "Thanks for playing", 2, paper);
-            PixelUI.TextCentered(322, "Art by Ezra    Music by Noah", 2, paper);
+            PixelUI.TextCentered(8, "You beat it", 4, paper);
+            PixelUI.Image(face, faceX, 96, FaceSize, Color.white);
+            PixelUI.TextCentered(260, "Development by Noah and Ezra", 2, paper);
+            PixelUI.TextCentered(298, "Art by Ezra", 2, paper);
+            PixelUI.TextCentered(336, "Music by Leif Andresen", 2, paper);
         }
 
         Button(playButton, PlayBox);
@@ -100,7 +96,6 @@ public sealed class ScreenUI : MonoBehaviour
     static void Button(Texture2D tex, Rect box)
     {
         bool hover = Hover(box);
-        // A hovered button lifts by two game pixels and brightens.
         PixelUI.Image(tex, box.x, box.y - (hover ? 2 : 0), ButtonSize, hover ? Color.white : new Color(0.88f, 0.88f, 0.88f));
     }
 }

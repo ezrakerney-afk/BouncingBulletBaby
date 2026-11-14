@@ -1,14 +1,12 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// Lives across level loads: loops the soundtrack and plays the sound effects.
-// Also swaps the mouse pointer for Ezra's crosshair, drawn on the game's pixel grid.
-// Esc goes back to the home screen, or quits from there.
+// Music, sound effects and the crosshair cursor. Esc goes to the menu, or quits from it.
 public sealed class GameShell : MonoBehaviour
 {
     public AudioClip music, gunshot, wallHit;
     public Texture2D cursor;
-    const int CursorSize = 2; // game pixels per crosshair pixel
+    const int CursorSize = 2; // game px per cursor px
     static AudioSource player, effects;
     static AudioClip shotClip, hitClip;
 
@@ -19,10 +17,9 @@ public sealed class GameShell : MonoBehaviour
     {
         var mouse = Mouse.current;
         if (cursor == null || mouse == null || Event.current.type != EventType.Repaint) return;
-        GUI.depth = -2000; // above everything, including the black fade
+        GUI.depth = -2000; // on top of the fade
         int pixel = PixelUI.Scale * CursorSize;
         Vector2 p = mouse.position.ReadValue();
-        // Centre the crosshair on the pointer (its red middle pixel is the aim point), snapped to whole pixels.
         float x = Mathf.Round(p.x - cursor.width * pixel / 2f);
         float y = Mathf.Round(Screen.height - p.y - cursor.height * pixel / 2f);
         GUI.DrawTexture(new Rect(x, y, cursor.width * pixel, cursor.height * pixel), cursor);
@@ -35,7 +32,7 @@ public sealed class GameShell : MonoBehaviour
         if (player != null) return;
         var go = new GameObject("Audio");
         DontDestroyOnLoad(go);
-        // The level cameras have no AudioListener, so this object carries the one listener for the whole game.
+        // level cameras have no listener
         if (FindFirstObjectByType<AudioListener>() == null) go.AddComponent<AudioListener>();
         player = go.AddComponent<AudioSource>();
         player.clip = music;
@@ -45,10 +42,8 @@ public sealed class GameShell : MonoBehaviour
         effects = go.AddComponent<AudioSource>();
     }
 
-    // Gunshot: firing the revolver, and clicking a menu button.
     public static void PlayGunshot() { if (effects != null && shotClip != null) effects.PlayOneShot(shotClip, 0.8f); }
 
-    // Wall hit: a bullet bouncing off a wall, and the mouse moving onto a menu button.
     public static void PlayWallHit() { if (effects != null && hitClip != null) effects.PlayOneShot(hitClip, 0.7f); }
 
     void Update()

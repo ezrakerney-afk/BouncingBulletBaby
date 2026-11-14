@@ -2,7 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-// Fades the whole screen to black, loads a level, then fades back in. Lives across level loads.
+// Fade to black, load, fade back in.
 public sealed class ScreenFade : MonoBehaviour
 {
     const float FadeTime = 0.35f;

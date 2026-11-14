@@ -1,13 +1,11 @@
 using UnityEngine;
 
-// Keeps a sprite on the game's pixel grid while its parent moves smoothly.
-// The parent (physics body) moves freely; this child is drawn at the nearest whole game pixel.
-// It can also leave a short trail of square pixels behind it.
+// Snaps a sprite to the pixel grid while its parent moves smoothly. Optional square trail.
 public sealed class PixelSnap : MonoBehaviour
 {
     public int pixelsPerUnit = 32;
     public int trailLength = 4;
-    public int trailSpacing = 6; // game pixels between trail squares
+    public int trailSpacing = 6; // px between trail squares
     Transform[] trail;
     Vector3 lastDrop;
     int nextSlot;
@@ -47,7 +45,6 @@ public sealed class PixelSnap : MonoBehaviour
         if (trail == null) return;
         float gap = (float)trailSpacing / pixelsPerUnit;
         if ((snapped - lastDrop).sqrMagnitude < gap * gap) return;
-        // Newest square takes the oldest slot; fade order follows age.
         var t = trail[nextSlot];
         t.position = lastDrop;
         t.gameObject.SetActive(true);
