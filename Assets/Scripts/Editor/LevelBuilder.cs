@@ -115,7 +115,16 @@ public static class LevelBuilder
         foreach (var b in lv.blocks) Block(level.transform, $"Block{++n}", b.center, b.size, Rock);
 
         // Baby + revolver
-        var baby = Sprite("Baby", null, lv.baby, new Vector2(0.9f, 1.1f), BabyCol, square);
+        // Real art drops in by file name: Assets/Art/background.png and Assets/Art/baby.png (16 px = 1 unit).
+        var backgroundArt = Art("background");
+        if (backgroundArt != null)
+        {
+            var bg = Sprite("Background", null, Vector2.zero, Vector2.one, Color.white, backgroundArt);
+            bg.GetComponent<SpriteRenderer>().sortingOrder = -100;
+        }
+        var babyArt = Art("baby");
+        var baby = Sprite("Baby", null, lv.baby, Vector2.one, babyArt != null ? Color.white : BabyCol, babyArt != null ? babyArt : square);
+        baby.GetComponent<SpriteRenderer>().sortingOrder = 10;
         var rb = baby.AddComponent<Rigidbody2D>(); rb.gravityScale = 3f; rb.interpolation = RigidbodyInterpolation2D.Interpolate;
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
         var col = baby.AddComponent<CapsuleCollider2D>(); col.size = new Vector2(1f, 1f); col.sharedMaterial = slick;
@@ -125,7 +134,7 @@ public static class LevelBuilder
 
         var gun = new GameObject("Revolver"); gun.transform.SetParent(baby.transform, false);
         var barrel = Sprite("Barrel", gun.transform, new Vector2(0.55f, 0), new Vector2(0.6f, 0.18f), new Color(0.2f, 0.2f, 0.22f), square);
-        barrel.transform.localScale = new Vector3(0.6f / 1.0f / 0.9f, 0.18f / 1.1f, 1);
+        barrel.GetComponent<SpriteRenderer>().sortingOrder = 11;
         var muzzle = new GameObject("Muzzle"); muzzle.transform.SetParent(gun.transform, false); muzzle.transform.localPosition = new Vector3(1.0f, 0, 0);
         var rev = gun.AddComponent<Revolver>();
         Set(rev, "bulletPrefab", bulletPrefab); Set(rev, "muzzle", muzzle.transform); Set(rev, "owner", baby.transform); Set(rev, "aimCamera", cam);
@@ -233,12 +242,17 @@ public static class LevelBuilder
     {
         var go = new GameObject(name);
         if (parent != null) go.transform.SetParent(parent, false);
-        go.transform.localPosition = pos;
-        go.transform.localScale = new Vector3(size.x, size.y, 1);
+        // Everything sits on the 16 px grid: positions and sizes are whole pixels.
+        go.transform.localPosition = new Vector3(Snap(pos.x), Snap(pos.y), 0);
+        go.transform.localScale = new Vector3(Mathf.Max(Pixel, Snap(size.x)), Mathf.Max(Pixel, Snap(size.y)), 1);
         var sr = go.AddComponent<SpriteRenderer>();
         sr.sprite = sprite; sr.color = color; sr.sharedMaterial = unlit;
         return go;
     }
+
+    const float Pixel = 1f / PixelsPerUnit;
+    static float Snap(float v) => Mathf.Round(v * PixelsPerUnit) / PixelsPerUnit;
+    static Sprite Art(string name) => AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Art/{name}.png");
 
     static void Set(Object obj, string field, object value)
     {
@@ -271,7 +285,7 @@ public static class LevelBuilder
         if (slick == null) { slick = new PhysicsMaterial2D("Slick") { friction = 0f, bounciness = 0f }; AssetDatabase.CreateAsset(slick, physPath); }
 
         var go = new GameObject("Bullet");
-        go.transform.localScale = Vector3.one * 0.28f;
+        go.transform.localScale = Vector3.one * 0.25f;
         var sr = go.AddComponent<SpriteRenderer>(); sr.sprite = circle; sr.color = new Color(1f, 0.85f, 0.2f); sr.sharedMaterial = unlit;
         var body = go.AddComponent<Rigidbody2D>(); body.gravityScale = 0;
         var cc = go.AddComponent<CircleCollider2D>(); cc.radius = 0.5f; cc.sharedMaterial = slick;

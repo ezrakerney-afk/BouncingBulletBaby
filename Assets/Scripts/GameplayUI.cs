@@ -1,10 +1,14 @@
 using UnityEngine;
 
-// Placeholder HUD: no Canvas, font assets, or scene serialization required.
+// Placeholder HUD drawn with PixelFont on the game's own pixel grid (544x320, integer upscaled).
 public sealed class GameplayUI : MonoBehaviour
 {
+    const int RefWidth = 544, RefHeight = 320;
+    static readonly Color Ink = new Color(0.16f, 0.09f, 0.05f);
+    static readonly Color Paper = new Color(1f, 0.95f, 0.8f);
+
     [SerializeField] LevelManager level;
-    GUIStyle big, small;
+    int scale, originX, originY;
 
     void Start()
     {
@@ -13,21 +17,35 @@ public sealed class GameplayUI : MonoBehaviour
 
     void OnGUI()
     {
-        if (level == null) return;
-        if (big == null)
-        {
-            big = new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            small = new GUIStyle(GUI.skin.label) { fontSize = 16 };
-        }
+        if (level == null || Event.current.type != EventType.Repaint) return;
+        // Match the Pixel Perfect Camera: whole-number zoom, centered.
+        scale = Mathf.Max(1, Mathf.Min(Screen.width / RefWidth, Screen.height / RefHeight));
+        originX = (Screen.width - RefWidth * scale) / 2;
+        originY = (Screen.height - RefHeight * scale) / 2;
 
-        GUI.Label(new Rect(16, 10, 1000, 24), $"{level.LevelName}   Bullets: {level.ShotsLeft}   Targets: {level.TargetsRemaining}" + (level.boss ? $"   Teddy phase {level.BossPhase}/3" : ""), small);
-        GUI.Label(new Rect(16, 32, 900, 24), "A/D move   Space jump   Left click shoot (bullets ricochet)   R restart", small);
-        GUI.Label(new Rect(16, 54, 1200, 48), level.instructions + "   Right click: rocket after pickup/target", small);
+        Line(4, 2, $"{level.LevelName}  BULLETS: {level.ShotsLeft}  TARGETS: {level.TargetsRemaining}" + (level.boss ? $"  TEDDY PHASE {level.BossPhase}/3" : ""), 1);
+        Line(4, 9, "A/D MOVE  SPACE JUMP  LEFT CLICK SHOOT  RIGHT CLICK ROCKET  R RESTART", 1);
+        Line(20, 20, level.instructions, 1);
 
         string center = null;
-        if (level.LevelComplete) center = (level.LevelName == "Level05" && level.ShotsLeft > 0 ? "SPARE SHOT BONUS!  " : "") + (level.HasNextLevel ? "YEEHAW!  Enter for next level" : "YOU BEAT IT!  Enter to play again");
-        else if (level.TargetHit) center = "TARGET HIT!  Right click: DIAPER ROCKET to the green flag";
-        else if (level.OutOfShots) center = "Out of bullets...";
-        if (center != null) GUI.Label(new Rect(0, Screen.height * 0.18f, Screen.width, 60), center, big);
+        if (level.LevelComplete) center = (level.LevelName == "Level05" && level.ShotsLeft > 0 ? "SPARE SHOT BONUS!  " : "") + (level.HasNextLevel ? "YEEHAW!  ENTER FOR NEXT LEVEL" : "YOU BEAT IT!  ENTER TO PLAY AGAIN");
+        else if (level.TargetHit) center = "TARGET HIT!  RIGHT CLICK: DIAPER ROCKET TO THE FLAG";
+        else if (level.OutOfShots) center = "OUT OF BULLETS...  R TO RESTART";
+        if (center != null) Line((RefWidth - PixelFont.Width(center) * 2) / 2, 60, center, 2);
+    }
+
+    // x, y and size are in game pixels, measured from the top left of the 544x320 view.
+    void Line(int x, int y, string text, int size)
+    {
+        var tex = PixelFont.Texture(text);
+        if (tex == null) return;
+        int s = scale * size;
+        var rect = new Rect(originX + x * scale, originY + y * scale, tex.width * s, tex.height * s);
+        var previous = GUI.color;
+        GUI.color = Ink;
+        GUI.DrawTexture(new Rect(rect.x + s, rect.y + s, rect.width, rect.height), tex);
+        GUI.color = Paper;
+        GUI.DrawTexture(rect, tex);
+        GUI.color = previous;
     }
 }
