@@ -21,24 +21,27 @@ public static class PixelUI
 
     public static int TextWidth(string text, int size) => PixelFont.Width(text) * size;
 
-    // Text with a one-pixel drop shadow. Returns the x just past the text, in game pixels.
-    public static int Text(int x, int y, string text, int size, Color color)
+    // Text, with a one-pixel drop shadow unless shadow is false (plain dark text on a white screen). Returns the x just past the text, in game pixels.
+    public static int Text(int x, int y, string text, int size, Color color, bool shadow = true)
     {
         var tex = PixelFont.Texture(text);
         if (tex == null) return x;
         var rect = ToScreen(x, y, tex.width * size, tex.height * size);
-        float shadow = Scale * size;
+        float offset = Scale * size;
         var previous = GUI.color;
-        GUI.color = Ink;
-        GUI.DrawTexture(new Rect(rect.x + shadow, rect.y + shadow, rect.width, rect.height), tex);
+        if (shadow)
+        {
+            GUI.color = Ink;
+            GUI.DrawTexture(new Rect(rect.x + offset, rect.y + offset, rect.width, rect.height), tex);
+        }
         GUI.color = color;
         GUI.DrawTexture(rect, tex);
         GUI.color = previous;
         return x + PixelFont.Width(text) * size;
     }
 
-    public static void TextCentered(int y, string text, int size, Color color) =>
-        Text((RefWidth - TextWidth(text, size)) / 2, y, text, size, color);
+    public static void TextCentered(int y, string text, int size, Color color, bool shadow = true) =>
+        Text((RefWidth - TextWidth(text, size)) / 2, y, text, size, color, shadow);
 
     public static void Box(float x, float y, float width, float height, Color color)
     {

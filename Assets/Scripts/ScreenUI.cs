@@ -67,9 +67,10 @@ public sealed class ScreenUI : MonoBehaviour
 
         if (kind == Kind.Menu)
         {
-            PixelUI.TextCentered(22, "Bouncing Bullet Baby", 3, paper);
+            // The home screen is plain white, so its text is dark ink with no shadow.
+            PixelUI.TextCentered(22, "Bouncing Bullet Baby", 3, PixelUI.Ink, false);
             PixelUI.Image(face, faceX, 104, FaceSize, Color.white);
-            PixelUI.TextCentered(280, "Bank your shots off the walls", 2, paper);
+            PixelUI.TextCentered(280, "Bank your shots off the walls", 2, PixelUI.Ink, false);
         }
         else if (kind == Kind.GameOver)
         {

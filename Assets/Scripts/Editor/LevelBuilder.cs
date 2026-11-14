@@ -109,8 +109,10 @@ public static class LevelBuilder
     {
         string path = $"Assets/Scenes/{sceneName}.unity";
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-        BuildCamera();
-        BuildBackground();
+        var cam = BuildCamera();
+        // The home screen is plain white; game over and the end screen keep the game background.
+        if (kind == ScreenUI.Kind.Menu) cam.backgroundColor = Color.white;
+        else BuildBackground();
         var go = new GameObject("Screen");
         var ui = go.AddComponent<ScreenUI>();
         ui.kind = kind;
