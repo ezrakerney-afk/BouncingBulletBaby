@@ -205,16 +205,24 @@ public static class LevelBuilder
         EditorSceneManager.SaveScene(scene, path);
     }
 
-    // One sprite per wall tile (so tile art can drop in as Assets/Art/tile.png), and one box collider
+    // Tiles outside the map count as solid so the outer ring only shows its inner face.
+    static bool Solid(Level lv, int col, int row) =>
+        col < 0 || row < 0 || col >= Cols || row >= Rows || lv.solid[col, row];
+
+    // One sprite per wall tile, picked by which neighbours are solid, and one box collider
     // per merged rectangle of tiles so bullets and the baby never catch on seams between tiles.
     static void BuildWalls(Level lv)
     {
         var walls = new GameObject("Walls");
-        var tileArt = Art("tile");
         for (int row = 0; row < Rows; row++)
             for (int col = 0; col < Cols; col++)
             {
                 if (!lv.solid[col, row]) continue;
+                // Which sides of this tile face open air: top = 1, right = 2, bottom = 4, left = 8.
+                // Assets/Art/Tiles/tile_<mask>.png holds the matching piece, already rotated to fit.
+                int mask = (Solid(lv, col, row - 1) ? 0 : 1) | (Solid(lv, col + 1, row) ? 0 : 2)
+                         | (Solid(lv, col, row + 1) ? 0 : 4) | (Solid(lv, col - 1, row) ? 0 : 8);
+                var tileArt = Art($"Tiles/tile_{mask}");
                 var t = Sprite($"Tile {col},{row}", walls.transform, Cell(col, row), Vector2.one,
                     tileArt != null ? Color.white : WallSand, tileArt != null ? tileArt : tile);
                 t.GetComponent<SpriteRenderer>().sortingOrder = 1;
