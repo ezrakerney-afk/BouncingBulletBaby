@@ -17,8 +17,6 @@ public sealed class BabyController : MonoBehaviour
     float lastGroundedTime = float.NegativeInfinity;
     bool jumpConsumed;
     public bool ControlsEnabled { get; set; } = true;
-    public bool RocketUnlocked { get; private set; }
-    public UnityEngine.Events.UnityEvent onRocketUnlocked = new UnityEngine.Events.UnityEvent();
 
     void Awake()
     {
@@ -67,13 +65,4 @@ public sealed class BabyController : MonoBehaviour
         }
         body.linearVelocity = velocity;
     }
-
-    public void UnlockRocket()
-    {
-        if (RocketUnlocked) return;
-        RocketUnlocked = true;
-        onRocketUnlocked.Invoke();
-    }
-
-    public void ApplyImpulse(Vector2 impulse) => body.AddForce(impulse, ForceMode2D.Impulse);
 }

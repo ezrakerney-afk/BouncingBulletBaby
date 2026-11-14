@@ -2,77 +2,48 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
-// Level flow: shoot the target (ricochets allowed) -> rocket unlocks + exit opens ->
-// reach the exit -> level complete. Out of shots with the target still up -> restart.
+// Level flow: hit every target (ricochets allowed) and the next level loads by itself.
+// Out of shots with a target still up restarts the level.
 public sealed class LevelManager : MonoBehaviour
 {
     [SerializeField] Revolver revolver;
     [SerializeField] BabyController baby;
-    [SerializeField] Target target;
-    [SerializeField] LevelExit exit;
     [SerializeField] bool restartWhenOutOfShots = true;
     [SerializeField] float restartDelay = 0.8f;
+    [SerializeField] float nextLevelDelay = 0.9f;
+    [SerializeField] float endScreenDelay = 4f;
     [SerializeField] float killY = -15f;
 
-    public bool TargetHit { get; private set; }
     public bool LevelComplete { get; private set; }
     public bool OutOfShots { get; private set; }
     public int ShotsLeft => revolver != null ? revolver.ShotsLeft : 0;
-    public string LevelName => SceneManager.GetActiveScene().name;
+    public int LevelNumber => SceneManager.GetActiveScene().buildIndex + 1;
     public bool HasNextLevel => SceneManager.GetActiveScene().buildIndex >= 0 &&
         SceneManager.GetActiveScene().buildIndex + 1 < SceneManager.sceneCountInBuildSettings;
-    float restartAt = -1f;
-    Target[] targets;
     public int TargetsRemaining { get; private set; }
-    public int BossPhase { get; private set; }
-    public bool boss;
-    public string instructions;
+    public string title;
+    float restartAt = -1f;
+    float nextAt = -1f;
 
     void Awake()
     {
         if (revolver == null) revolver = FindFirstObjectByType<Revolver>();
         if (baby == null) baby = FindFirstObjectByType<BabyController>();
-        if (target == null) target = FindFirstObjectByType<Target>();
-        if (exit == null) exit = FindFirstObjectByType<LevelExit>();
-        targets = FindObjectsByType<Target>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        var targets = FindObjectsByType<Target>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var t in targets) if (t.gameObject.scene == gameObject.scene) TargetsRemaining++;
-        if (boss) BossPhase = 1;
     }
 
-    void OnEnable() { Target.OnHit += HandleTargetHit; LevelExit.OnReached += HandleExit; }
-    void OnDisable() { Target.OnHit -= HandleTargetHit; LevelExit.OnReached -= HandleExit; }
+    void OnEnable() { Target.OnHit += HandleTargetHit; }
+    void OnDisable() { Target.OnHit -= HandleTargetHit; }
 
     void HandleTargetHit(Target hit)
     {
-        if (TargetHit || hit.gameObject.scene != gameObject.scene) return;
+        if (LevelComplete || hit.gameObject.scene != gameObject.scene) return;
         TargetsRemaining--;
-        if (TargetsRemaining > 0)
-        {
-            if (boss)
-            {
-                BossPhase++;
-                if (revolver != null) revolver.Reload();
-                restartAt = -1f;
-                OutOfShots = false;
-            }
-            return;
-        }
-        TargetHit = true;
-        if (baby != null) baby.UnlockRocket();
-        if (revolver != null) revolver.CanShoot = false;
-        if (exit == null) Complete(); // levels without an exit finish on the hit
-    }
-
-    void HandleExit(LevelExit reached)
-    {
-        if (reached.gameObject.scene == gameObject.scene && TargetHit) Complete();
-    }
-
-    void Complete()
-    {
-        if (LevelComplete) return;
+        if (TargetsRemaining > 0) return;
         LevelComplete = true;
-        if (baby != null) baby.ControlsEnabled = false;
+        if (revolver != null) revolver.CanShoot = false;
+        nextAt = Time.time + (HasNextLevel ? nextLevelDelay : endScreenDelay);
     }
 
     void Update()
@@ -82,7 +53,7 @@ public sealed class LevelManager : MonoBehaviour
 
         if (LevelComplete)
         {
-            if (keyboard != null && (keyboard.enterKey.wasPressedThisFrame || keyboard.spaceKey.wasPressedThisFrame))
+            if (Time.time >= nextAt)
             {
                 if (HasNextLevel) LoadNextLevel(); else LoadFirstLevel();
             }
@@ -92,7 +63,7 @@ public sealed class LevelManager : MonoBehaviour
         if (baby != null && baby.transform.position.y < killY) RestartLevel();
 
         // The last bullet must finish its ricochets before declaring failure.
-        if (!TargetHit && restartWhenOutOfShots && revolver != null && ShotsLeft == 0 &&
+        if (restartWhenOutOfShots && revolver != null && ShotsLeft == 0 &&
             FindFirstObjectByType<RicochetBullet>() == null)
         {
             if (restartAt < 0f) { OutOfShots = true; restartAt = Time.time + restartDelay; }

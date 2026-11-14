@@ -6,8 +6,8 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
 
-// Builds the greybox levels from code so nobody hand-edits .unity files.
-// Menu: Bouncing Bullet Baby > Build Greybox Levels. Batch: -executeMethod LevelBuilder.BuildAll
+// Builds every level scene from the tile maps in Assets/Levels so nobody hand-edits .unity files.
+// Menu: Bouncing Bullet Baby > Build Levels. Batch: -executeMethod LevelBuilder.BuildAll
 public static class LevelBuilder
 {
     const string ArtDir = "Assets/Art/Placeholder";
@@ -18,80 +18,88 @@ public static class LevelBuilder
 
     static readonly Color Sand = new Color(0.93f, 0.80f, 0.56f);
     static readonly Color Wood = new Color(0.45f, 0.28f, 0.16f);
-    static readonly Color Rock = new Color(0.62f, 0.42f, 0.30f);
     static readonly Color BabyCol = new Color(1f, 0.85f, 0.75f);
     static readonly Color TargetCol = new Color(0.9f, 0.12f, 0.12f);
 
-    static Sprite square, circle;
+    static Sprite square, circle, tile, pixel;
     static Material unlit;
     static PhysicsMaterial2D slick;
     static RicochetBullet bulletPrefab;
 
+    const string LevelDir = "Assets/Levels";
+    // Every level is a 30 x 18 tile map (one tile = one unit = 32 px). Tile (col, row) has its
+    // centre at x = col - 14.5, y = 8.5 - row, so the outer ring of wall tiles frames the 960x540 view.
+    const int Cols = 30, Rows = 18;
+
     struct Level
     {
         public string name;
-        public Vector2 baby, target, exit;
         public int shots;
-        public Vector2[] targets;
-        public int[] bounces;
-        public bool boss;
-        public List<(Vector2 center, Vector2 size)> blocks;
+        public bool[,] solid;      // [col, row]
+        public Vector2 baby;       // centre of the tile the baby's feet stand in
+        public List<Vector2> targets;
     }
 
-    [MenuItem("Bouncing Bullet Baby/Build Greybox Levels")]
+    static Vector2 Cell(int col, int row) => new Vector2(col - 14.5f, 8.5f - row);
+
+    [MenuItem("Bouncing Bullet Baby/Build Levels")]
     public static void BuildAll()
     {
         EnsureAssets();
         var levels = Levels();
         var scenes = new List<EditorBuildSettingsScene>();
         Directory.CreateDirectory(SceneDir);
-        foreach (int i in new[] { 0, 1, 2, 5, 3, 4 })
+        for (int i = 0; i < levels.Count; i++)
         {
             string path = $"{SceneDir}/Level{i + 1:00}.unity";
-            BuildScene(levels[i], path);
+            BuildScene(levels[i], path, i);
             scenes.Add(new EditorBuildSettingsScene(path, true));
         }
-        scenes.Sort((a, b) => string.CompareOrdinal(a.path, b.path));
         EditorBuildSettings.scenes = scenes.ToArray();
         AssetDatabase.SaveAssets();
-        EditorSceneManager.OpenScene($"{SceneDir}/Level01.unity");
+        if (levels.Count > 0) EditorSceneManager.OpenScene($"{SceneDir}/Level01.unity");
         Debug.Log($"LevelBuilder: built {levels.Count} levels");
     }
 
+    // Level files: Assets/Levels/Level01.txt ... First line "NAME|SHOTS", then 18 rows of 30 characters:
+    // '#' wall tile, '.' empty, 'B' baby start, 'T' target. tools/levels.py checks they can be beaten.
     static List<Level> Levels()
     {
-        // Arena is x -16..16, y -9..9. Outer walls are added for every level.
         var list = new List<Level>();
-        list.Add(new Level { name = "Level01 - First Shot", baby = new Vector2(-12, -7.5f), target = new Vector2(12.5f, -7.5f), exit = new Vector2(12.5f, -2f),
-            blocks = new List<(Vector2, Vector2)> { (new Vector2(0, -4f), new Vector2(1.5f, 10f)), (new Vector2(12.5f, -3.6f), new Vector2(5f, 0.6f)) } });
-        // Build in priority order below; play order remains 1,2,3,4,5,boss.
-        list.Add(new Level { name = "Level02 - Bank Shot", shots = 3, baby = new Vector2(-12, -7.5f),
-            targets = new[] { new Vector2(8, -4), new Vector2(12, 3) }, bounces = new[] { 1, 1 },
-            blocks = new List<(Vector2, Vector2)> { (new Vector2(0, -2), new Vector2(2, 14)) } });
-        list.Add(new Level { name = "Level03 - Crib Climb", shots = 4, baby = new Vector2(-12, -7.5f),
-            targets = new[] { new Vector2(-5, -6.3f), new Vector2(8, 0), new Vector2(-5, 6) },
-            blocks = new List<(Vector2, Vector2)> {
-                (new Vector2(-9, -7.5f), new Vector2(10, .6f)),
-                (new Vector2(7, -1), new Vector2(12, .6f)),
-                (new Vector2(-7, 4.5f), new Vector2(12, .6f)),
-                (new Vector2(-5, -5.1f), new Vector2(3, .5f)),
-                (new Vector2(8, 1.2f), new Vector2(3, .5f)),
-                (new Vector2(-5, 7.2f), new Vector2(3, .5f)) } });
-        list.Add(new Level { name = "Level04 - Mobile", shots = 4, baby = new Vector2(-12, -7.5f),
-            targets = new[] { new Vector2(-6, 5), new Vector2(6, 5), new Vector2(-10, 0), new Vector2(10, 0) },
-            blocks = new List<(Vector2, Vector2)>() });
-        list.Add(new Level { name = "Level05 - Playpen Gauntlet", shots = 5, baby = new Vector2(-12, -7.5f),
-            targets = new[] { new Vector2(-8, 6.3f), new Vector2(12, 5), new Vector2(3, -4), new Vector2(7, -4), new Vector2(11, -4) },
-            bounces = new[] { 0, 2, 1, 1, 1 },
-            blocks = new List<(Vector2, Vector2)> { (new Vector2(-9, 4.5f), new Vector2(10, .6f)),
-                (new Vector2(0, 0), new Vector2(1, 9)) } });
-        list.Add(new Level { name = "Boss - Big Teddy", shots = 6, boss = true, baby = new Vector2(-12, -7.5f),
-            targets = new[] { new Vector2(3.8f, 0), new Vector2(-3.8f, 0), new Vector2(-4.2f, 1) },
-            bounces = new[] { 1, 0, 0 }, blocks = new List<(Vector2, Vector2)>() });
+        var files = new List<string>(Directory.GetFiles(LevelDir, "Level*.txt"));
+        files.Sort(string.CompareOrdinal);
+        foreach (string file in files)
+        {
+            var lines = new List<string>();
+            foreach (string raw in File.ReadAllLines(file))
+            {
+                string line = raw.TrimEnd();
+                if (line.Length > 0) lines.Add(line);
+            }
+            if (lines.Count != Rows + 1) { Debug.LogError($"LevelBuilder: {file} needs a title line and {Rows} rows"); continue; }
+            string[] head = lines[0].Split('|');
+            int shots = 6;
+            if (head.Length > 1) int.TryParse(head[1], out shots);
+            var lv = new Level { name = head[0].Trim(), shots = shots, solid = new bool[Cols, Rows], targets = new List<Vector2>() };
+            bool ok = true;
+            for (int row = 0; row < Rows; row++)
+            {
+                string text = lines[row + 1];
+                if (text.Length != Cols) { Debug.LogError($"LevelBuilder: {file} row {row + 1} needs {Cols} characters"); ok = false; break; }
+                for (int col = 0; col < Cols; col++)
+                {
+                    char c = text[col];
+                    if (c == '#') lv.solid[col, row] = true;
+                    else if (c == 'B') lv.baby = Cell(col, row);
+                    else if (c == 'T') lv.targets.Add(Cell(col, row));
+                }
+            }
+            if (ok) list.Add(lv);
+        }
         return list;
     }
 
-    static void BuildScene(Level lv, string path)
+    static void BuildScene(Level lv, string path, int index)
     {
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -107,36 +115,29 @@ public static class LevelBuilder
         pixelCamera.gridSnapping = PixelPerfectCamera.GridSnapping.UpscaleRenderTexture;
         Set(pixelCamera, "m_FilterMode", (int)PixelPerfectCamera.PixelPerfectFilterMode.Point);
 
-        var level = new GameObject("Level");
-        // Room interior is 28x16 units so the walls stay inside the 30x16.9 unit view.
-        Block(level.transform, "Floor", new Vector2(0, -9), new Vector2(34, 2), Wood);
-        Block(level.transform, "Ceiling", new Vector2(0, 9), new Vector2(34, 2), Wood);
-        Block(level.transform, "WallL", new Vector2(-15, 0), new Vector2(2, 20), Wood);
-        Block(level.transform, "WallR", new Vector2(15, 0), new Vector2(2, 20), Wood);
-        int n = 0;
-        foreach (var b in lv.blocks) Block(level.transform, $"Block{++n}", b.center, b.size, Rock);
-
-        // Baby + revolver
-        // Real art drops in by file name: Assets/Art/background.png and Assets/Art/baby.png (16 px = 1 unit).
-        var backgroundArt = Art("background");
+        // Background: Assets/Art/background.png for the first half of the game, background2.png after.
+        var backgroundArt = index >= 3 ? Art("background2") : null;
+        if (backgroundArt == null) backgroundArt = Art("background");
         if (backgroundArt != null)
         {
             var bg = Sprite("Background", null, Vector2.zero, Vector2.one, Color.white, backgroundArt);
             bg.GetComponent<SpriteRenderer>().sortingOrder = -100;
         }
+
+        BuildWalls(lv);
+
+        // Baby + revolver
         var babyFrames = BabyFrames();
         bool hasBabyArt = babyFrames != null;
+        // The baby sprite is 2x2 units with the feet on its bottom edge, so its centre is half a unit above the feet tile's centre.
         var baby = Sprite("Baby", null, lv.baby + Vector2.up * 0.5f, Vector2.one, hasBabyArt ? Color.white : BabyCol, hasBabyArt ? babyFrames[0] : square);
         baby.GetComponent<SpriteRenderer>().sortingOrder = 10;
         var rb = baby.AddComponent<Rigidbody2D>(); rb.gravityScale = 3f; rb.interpolation = RigidbodyInterpolation2D.Interpolate;
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
         var col = baby.AddComponent<CapsuleCollider2D>(); col.sharedMaterial = slick;
-        // The art is a 64x64 px frame (2x2 units) with the feet on its bottom edge; the body is about 0.9 x 1.65 units.
         if (hasBabyArt) { col.size = new Vector2(0.9f, 1.65f); col.offset = new Vector2(0, -0.175f); }
-        else col.size = new Vector2(1f, 1f);
-        var bc = baby.AddComponent<BabyController>();
-        var rocket = baby.AddComponent<DiaperRocket>();
-        Set(rocket, "boostSpeed", 20f); Set(rocket, "boostDuration", 0.4f); Set(rocket, "cooldown", 0.3f);
+        else { col.size = new Vector2(0.9f, 1f); col.offset = new Vector2(0, -0.5f); }
+        baby.AddComponent<BabyController>();
 
         var gun = new GameObject("Revolver"); gun.transform.SetParent(baby.transform, false);
         if (hasBabyArt)
@@ -151,73 +152,28 @@ public static class LevelBuilder
             var barrel = Sprite("Barrel", gun.transform, new Vector2(0.55f, 0), new Vector2(0.6f, 0.18f), new Color(0.2f, 0.2f, 0.22f), square);
             barrel.GetComponent<SpriteRenderer>().sortingOrder = 11;
         }
-        var muzzle = new GameObject("Muzzle"); muzzle.transform.SetParent(gun.transform, false); muzzle.transform.localPosition = new Vector3(hasBabyArt ? 1.25f : 1.0f, 0, 0);
+        // 0.7 units matches MUZZLE in tools/levels.py.
+        var muzzle = new GameObject("Muzzle"); muzzle.transform.SetParent(gun.transform, false); muzzle.transform.localPosition = new Vector3(0.7f, 0, 0);
         var rev = gun.AddComponent<Revolver>();
         Set(rev, "bulletPrefab", bulletPrefab); Set(rev, "muzzle", muzzle.transform); Set(rev, "owner", baby.transform); Set(rev, "aimCamera", cam);
-
         Set(rev, "capacity", lv.shots > 0 ? lv.shots : 6);
 
-        // Target + exit
-        var positions = lv.targets ?? new[] { lv.target };
-        var targetObjects = new List<GameObject>();
-        for (int j = 0; j < positions.Length; j++)
+        // Targets
+        var targetArt = Art("target");
+        for (int j = 0; j < lv.targets.Count; j++)
         {
-            var targetArt = Art("target");
-            var target = Sprite($"Target{j + 1}", null, positions[j], targetArt != null ? Vector2.one : Vector2.one * .9f, targetArt != null ? Color.white : TargetCol, targetArt != null ? targetArt : circle);
-            target.AddComponent<CircleCollider2D>().isTrigger = true;
-            var t = target.AddComponent<Target>(); Set(t, "baby", bc);
-            t.requiredBounces = lv.bounces != null ? lv.bounces[j] : 0;
-            t.requiresCeilingBounce = lv.boss && j == 0;
-            t.penetrate = lv.name.Contains("Gauntlet") && j >= 2;
-            targetObjects.Add(target);
-            if (targetArt == null) Sprite("Bullseye", target.transform, Vector2.zero, Vector2.one * .45f, Color.white, circle);
-            if (lv.boss) target.AddComponent<GreyboxMotion>().phase = j + 1;
-            if (lv.name.Contains("Mobile") && j < 2)
-            {
-                var motion = target.AddComponent<GreyboxMotion>();
-                motion.amplitude = new Vector2(2.5f, .6f); motion.frequency = 1.2f; motion.offset = j * Mathf.PI;
-                Sprite("Hanger", level.transform, new Vector2(positions[j].x, 7.7f), new Vector2(.1f, 2.4f), Wood, square);
-            }
-        }
-        if (lv.name.Contains("Crib") || lv.name.Contains("Gauntlet"))
-        {
-            var pickup = Sprite("DiaperRocket Pickup (right click to boost)", null,
-                lv.name.Contains("Crib") ? new Vector2(-11, -6.4f) : new Vector2(-11, -7.5f), Vector2.one, Color.cyan, circle);
-            pickup.AddComponent<CircleCollider2D>().isTrigger = true;
-            pickup.AddComponent<RocketPickup>();
-        }
-        if (lv.name.Contains("Mobile"))
-        {
-            foreach (float x in new[] { -10f, 10f })
-            {
-                var deflector = Block(level.transform, "45 degree deflector", new Vector2(x, -2), new Vector2(3, .5f), Rock);
-                deflector.transform.rotation = Quaternion.Euler(0, 0, x < 0 ? 45 : -45);
-                Block(level.transform, "Target cover", new Vector2(x - (x < 0 ? 1.4f : -1.4f), 0), new Vector2(.5f, 2), Rock);
-            }
-        }
-        if (lv.boss) BuildTeddy(level.transform, targetObjects);
-        if (lv.name.Contains("Crib"))
-            foreach (var position in positions)
-                Block(level.transform, "Crib alcove back", position + Vector2.right * 1.5f, new Vector2(.5f, 2.4f), Rock);
-
-        // First Shot retains its rocket-to-exit tutorial; later rooms clear on all targets.
-        if (lv.targets == null)
-        {
-            var exit = new GameObject("Exit"); exit.transform.position = lv.exit;
-            var flag = Sprite("Flag", exit.transform, new Vector2(0, .2f), new Vector2(.9f, 1.6f), Color.gray, square);
-            var trig = exit.AddComponent<BoxCollider2D>(); trig.size = new Vector2(1.2f, 2); trig.isTrigger = true;
-            var le = exit.AddComponent<LevelExit>(); Set(le, "flag", flag.GetComponent<SpriteRenderer>());
+            var target = Sprite($"Target{j + 1}", null, lv.targets[j], targetArt != null ? Vector2.one : Vector2.one * .9f, targetArt != null ? Color.white : TargetCol, targetArt != null ? targetArt : circle);
+            target.GetComponent<SpriteRenderer>().sortingOrder = 5;
+            var hitArea = target.AddComponent<CircleCollider2D>();
+            hitArea.isTrigger = true;
+            hitArea.radius = 0.5f / target.transform.localScale.x;
+            target.AddComponent<Target>();
+            if (targetArt == null) Sprite("Bullseye", target.transform, Vector2.zero, Vector2.one * .45f, Color.white, circle).GetComponent<SpriteRenderer>().sortingOrder = 6;
         }
 
         var mgr = new GameObject("LevelManager");
         var manager = mgr.AddComponent<LevelManager>();
-        manager.boss = lv.boss;
-        manager.instructions = lv.name + (lv.boss ? ": ceiling bank, moving spot, shield gap; ammo refills per phase."
-            : lv.name.Contains("Bank") ? ": both targets require a wall bank."
-            : lv.name.Contains("Crib") ? ": jump onto tier 1, collect cyan rocket, boost between firing ledges."
-            : lv.name.Contains("Mobile") ? ": time swinging targets; use the angled deflectors."
-            : lv.name.Contains("Gauntlet") ? ": cyan rocket to high ledge; upper-right target needs 2 bounces; bank through the lower row."
-            : ": hit the target, then rocket to the flag.");
+        manager.title = lv.name.ToUpperInvariant();
         mgr.AddComponent<GameplayUI>();
         var shell = mgr.AddComponent<GameShell>();
         shell.music = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/soundtrack.ogg");
@@ -225,43 +181,60 @@ public static class LevelBuilder
         EditorSceneManager.SaveScene(scene, path);
     }
 
-    static void BuildTeddy(Transform parent, List<GameObject> targets)
+    // One sprite per wall tile (so tile art can drop in as Assets/Art/tile.png), and one box collider
+    // per merged rectangle of tiles so bullets and the baby never catch on seams between tiles.
+    static void BuildWalls(Level lv)
     {
-        var teddy = Block(parent, "Big Teddy (6x6)", Vector2.zero, new Vector2(6, 6), Wood);
-        Sprite("Left ear", teddy.transform, new Vector2(-.4f, .5f), Vector2.one * .35f, Rock, circle);
-        Sprite("Right ear", teddy.transform, new Vector2(.4f, .5f), Vector2.one * .35f, Rock, circle);
-        // Phase two motion is shared by body and exposed weak spot.
-        var movement = teddy.AddComponent<GreyboxMotion>();
-        movement.phase = 2; movement.amplitude = new Vector2(3, 0); movement.frequency = .8f;
-        // Keep a stationary body in phases one and three.
-        for (int phase = 1; phase <= 3; phase += 2)
-            Block(parent, $"Teddy phase {phase}", Vector2.zero, new Vector2(6, 6), Wood).AddComponent<GreyboxMotion>().phase = phase;
-        var spotMotion = targets[1].GetComponent<GreyboxMotion>();
-        spotMotion.amplitude = new Vector2(3, 0); spotMotion.frequency = .8f;
-        var thrown = Block(null, "Thrown block template", new Vector2(0, -30), Vector2.one, Rock);
-        thrown.AddComponent<Rigidbody2D>().gravityScale = 1;
-        thrown.SetActive(false);
-        movement.throwBlocks = true; movement.blockPrefab = thrown;
-        var shields = new GameObject("Rotating shields"); shields.transform.position = targets[2].transform.position;
-        var spin = shields.AddComponent<GreyboxMotion>(); spin.phase = 3; spin.rotationSpeed = 65;
-        Block(shields.transform, "Shield A", new Vector2(0, 1.5f), new Vector2(2, .3f), Color.gray);
-        Block(shields.transform, "Shield B", new Vector2(0, -1.5f), new Vector2(2, .3f), Color.gray);
-    }
+        var walls = new GameObject("Walls");
+        var tileArt = Art("tile");
+        for (int row = 0; row < Rows; row++)
+            for (int col = 0; col < Cols; col++)
+            {
+                if (!lv.solid[col, row]) continue;
+                var t = Sprite($"Tile {col},{row}", walls.transform, Cell(col, row), Vector2.one,
+                    tileArt != null ? Color.white : Wood, tileArt != null ? tileArt : tile);
+                t.GetComponent<SpriteRenderer>().sortingOrder = 1;
+            }
 
-    static GameObject Block(Transform parent, string name, Vector2 center, Vector2 size, Color color)
-    {
-        center = new Vector2(Mathf.Round(center.x), Mathf.Round(center.y));
-        size = new Vector2(Mathf.Max(1, Mathf.Round(size.x)), Mathf.Max(1, Mathf.Round(size.y)));
-        var go = Sprite(name, parent, center, size, color, square);
-        go.AddComponent<BoxCollider2D>().sharedMaterial = slick;
-        return go;
+        var used = new bool[Cols, Rows];
+        for (int row = 0; row < Rows; row++)
+            for (int col = 0; col < Cols; col++)
+            {
+                if (!lv.solid[col, row] || used[col, row]) continue;
+                int w = 1;
+                while (col + w < Cols && lv.solid[col + w, row] && !used[col + w, row]) w++;
+                int h = 1;
+                while (row + h < Rows)
+                {
+                    bool full = true;
+                    for (int c = col; c < col + w; c++)
+                        if (!lv.solid[c, row + h] || used[c, row + h]) { full = false; break; }
+                    if (!full) break;
+                    h++;
+                }
+                for (int r = row; r < row + h; r++)
+                    for (int c = col; c < col + w; c++) used[c, r] = true;
+                var box = walls.AddComponent<BoxCollider2D>();
+                box.sharedMaterial = slick;
+                box.size = new Vector2(w, h);
+                box.offset = new Vector2(col - 15f + w / 2f, 9f - row - h / 2f);
+            }
+
+        // Thick backstops outside the view so nothing can ever leave the room.
+        foreach (var (center, size) in new[] {
+            (new Vector2(0, -11), new Vector2(40, 4)), (new Vector2(0, 11), new Vector2(40, 4)),
+            (new Vector2(-17, 0), new Vector2(4, 26)), (new Vector2(17, 0), new Vector2(4, 26)) })
+        {
+            var box = walls.AddComponent<BoxCollider2D>();
+            box.sharedMaterial = slick; box.size = size; box.offset = center;
+        }
     }
 
     static GameObject Sprite(string name, Transform parent, Vector2 pos, Vector2 size, Color color, Sprite sprite)
     {
         var go = new GameObject(name);
         if (parent != null) go.transform.SetParent(parent, false);
-        // Everything sits on the 16 px grid: positions and sizes are whole pixels.
+        // Everything sits on the pixel grid: positions and sizes are whole game pixels.
         go.transform.localPosition = new Vector3(Snap(pos.x), Snap(pos.y), 0);
         go.transform.localScale = new Vector3(Mathf.Max(Pixel, Snap(size.x)), Mathf.Max(Pixel, Snap(size.y)), 1);
         var sr = go.AddComponent<SpriteRenderer>();
@@ -303,8 +276,10 @@ public static class LevelBuilder
     {
         Directory.CreateDirectory(ArtDir);
         Directory.CreateDirectory("Assets/Prefabs");
-        square = MakeSprite($"{ArtDir}/square.png", false);
-        circle = MakeSprite($"{ArtDir}/circle.png", true);
+        square = MakeSprite($"{ArtDir}/square.png", 0);
+        circle = MakeSprite($"{ArtDir}/circle.png", 1);
+        tile = MakeSprite($"{ArtDir}/tile.png", 2);
+        pixel = MakeSprite($"{ArtDir}/bullet.png", 3);
 
         var shader = Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit-Default") ?? Shader.Find("Sprites/Default");
         const string matPath = ArtDir + "/Unlit.mat";
@@ -315,31 +290,36 @@ public static class LevelBuilder
         slick = AssetDatabase.LoadAssetAtPath<PhysicsMaterial2D>(physPath);
         if (slick == null) { slick = new PhysicsMaterial2D("Slick") { friction = 0f, bounciness = 0f }; AssetDatabase.CreateAsset(slick, physPath); }
 
+        // The bullet is a 4x4 px square. Its physics body moves smoothly; the visible square is a child
+        // that PixelSnap keeps on the same pixel grid as everything else, with a short square-pixel trail.
         var go = new GameObject("Bullet");
-        go.transform.localScale = Vector3.one * 0.25f;
-        var sr = go.AddComponent<SpriteRenderer>(); sr.sprite = circle; sr.color = new Color(1f, 0.85f, 0.2f); sr.sharedMaterial = unlit;
         var body = go.AddComponent<Rigidbody2D>(); body.gravityScale = 0;
-        var cc = go.AddComponent<CircleCollider2D>(); cc.radius = 0.5f; cc.sharedMaterial = slick;
-        go.AddComponent<TrailRenderer>().time = 0.12f;
-        var tr = go.GetComponent<TrailRenderer>(); tr.startWidth = 0.15f; tr.endWidth = 0f; tr.sharedMaterial = unlit;
-        tr.startColor = new Color(1f, 0.9f, 0.4f); tr.endColor = new Color(1f, 0.5f, 0.1f, 0f);
+        var cc = go.AddComponent<CircleCollider2D>(); cc.radius = 2f / PixelsPerUnit; cc.sharedMaterial = slick;
         go.AddComponent<RicochetBullet>();
+        var look = new GameObject("Pixel"); look.transform.SetParent(go.transform, false);
+        var sr = look.AddComponent<SpriteRenderer>(); sr.sprite = pixel; sr.sharedMaterial = unlit; sr.sortingOrder = 8;
+        sr.color = Art("bullet") != null ? Color.white : new Color(0.2f, 0.13f, 0.1f);
+        if (Art("bullet") != null) sr.sprite = Art("bullet");
+        look.AddComponent<PixelSnap>().pixelsPerUnit = PixelsPerUnit;
         bulletPrefab = PrefabUtility.SaveAsPrefabAsset(go, BulletPath).GetComponent<RicochetBullet>();
         Object.DestroyImmediate(go);
     }
 
-    static Sprite MakeSprite(string path, bool round)
+    // kind 0 = solid square, 1 = disc, 2 = wall tile with a darker 1 px edge, 3 = 4x4 px bullet.
+    static Sprite MakeSprite(string path, int kind)
     {
-        // Regenerate our two owned placeholders so older 64px assets migrate too.
+        // Regenerate our owned placeholders every build so old sizes migrate too.
         {
-            const int s = PixelsPerUnit;
+            int s = kind == 3 ? 4 : PixelsPerUnit;
             var tex = new Texture2D(s, s, TextureFormat.RGBA32, false);
             for (int y = 0; y < s; y++)
                 for (int x = 0; x < s; x++)
                 {
                     float dx = x - s / 2f + 0.5f, dy = y - s / 2f + 0.5f;
-                    bool on = !round || dx * dx + dy * dy <= (s / 2f) * (s / 2f);
-                    tex.SetPixel(x, y, on ? Color.white : Color.clear);
+                    Color c = Color.white;
+                    if (kind == 1 && dx * dx + dy * dy > (s / 2f) * (s / 2f)) c = Color.clear;
+                    if (kind == 2 && (x == 0 || y == 0 || x == s - 1 || y == s - 1)) c = new Color(0.72f, 0.72f, 0.72f);
+                    tex.SetPixel(x, y, c);
                 }
             File.WriteAllBytes(path, tex.EncodeToPNG());
             Object.DestroyImmediate(tex);

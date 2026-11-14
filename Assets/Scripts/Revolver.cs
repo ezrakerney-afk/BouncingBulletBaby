@@ -39,14 +39,27 @@ public sealed class Revolver : MonoBehaviour
     public bool TryFire(Vector2 direction)
     {
         if (!CanShoot || ShotsLeft <= 0 || Time.time < nextShot || bulletPrefab == null || direction.sqrMagnitude < 0.001f) return false;
-        Transform origin = muzzle != null ? muzzle : transform;
-        var bullet = Instantiate(bulletPrefab, origin.position, Quaternion.identity);
+        var bullet = Instantiate(bulletPrefab, SpawnPoint(), Quaternion.identity);
         bullet.Launch(direction.normalized, owner);
         ShotsLeft--;
         nextShot = Time.time + shotInterval;
         onShotsChanged.Invoke(ShotsLeft);
         onFired.Invoke();
         return true;
+    }
+
+    // The bullet starts at the muzzle, unless a wall sits between the gun and the muzzle:
+    // then it starts at the gun itself so it can never spawn inside a wall.
+    Vector2 SpawnPoint()
+    {
+        if (muzzle == null) return transform.position;
+        foreach (var hit in Physics2D.LinecastAll(transform.position, muzzle.position))
+        {
+            if (hit.collider == null || hit.collider.isTrigger) continue;
+            if (owner != null && hit.collider.transform.IsChildOf(owner)) continue;
+            return transform.position;
+        }
+        return muzzle.position;
     }
 
     public void Reload()
