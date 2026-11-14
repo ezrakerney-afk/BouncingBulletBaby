@@ -10,6 +10,7 @@ public sealed class RicochetBullet : MonoBehaviour
     Vector2 direction;
     BabyController shooter;
     int bounces;
+    bool ceilingBounce;
 
     void Awake()
     {
@@ -23,6 +24,7 @@ public sealed class RicochetBullet : MonoBehaviour
     {
         direction = heading.normalized;
         bounces = 0;
+        ceilingBounce = false;
         shooter = owner != null ? owner.GetComponentInParent<BabyController>() : null;
         if (owner != null)
             foreach (var ownCollider in owner.GetComponentsInChildren<Collider2D>())
@@ -37,8 +39,9 @@ public sealed class RicochetBullet : MonoBehaviour
         var target = collision.collider.GetComponentInParent<Target>();
         if (target != null)
         {
+            if (!target.AcceptsBullet(bounces, ceilingBounce)) { Destroy(gameObject); return; }
             target.Hit(shooter);
-            Destroy(gameObject);
+            if (!target.penetrate) Destroy(gameObject);
             return;
         }
         if (bounces >= maxBounces || collision.contactCount == 0)
@@ -49,13 +52,15 @@ public sealed class RicochetBullet : MonoBehaviour
         direction = Vector2.Reflect(direction, collision.GetContact(0).normal).normalized;
         body.linearVelocity = direction * speed;
         bounces++;
+        ceilingBounce |= collision.collider.name == "Ceiling";
     }
 
     void OnTriggerEnter2D(Collider2D other)
     {
         var target = other.GetComponentInParent<Target>();
         if (target == null) return;
+        if (!target.AcceptsBullet(bounces, ceilingBounce)) return;
         target.Hit(shooter);
-        Destroy(gameObject);
+        if (!target.penetrate) Destroy(gameObject);
     }
 }

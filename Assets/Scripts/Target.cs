@@ -8,6 +8,12 @@ public sealed class Target : MonoBehaviour
     [SerializeField] BabyController baby;
     public UnityEvent onHit = new UnityEvent();
     public bool IsHit { get; private set; }
+    [Min(0)] public int requiredBounces;
+    public bool requiresCeilingBounce;
+    public bool penetrate;
+
+    public bool AcceptsBullet(int bounces, bool ceiling) =>
+        !IsHit && bounces >= requiredBounces && (!requiresCeilingBounce || ceiling);
 
     public void Hit(BabyController shooter = null)
     {
