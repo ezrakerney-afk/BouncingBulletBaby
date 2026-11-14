@@ -131,6 +131,7 @@ public static class LevelBuilder
         shell.music = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/soundtrack.ogg");
         shell.gunshot = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/gunshot.ogg");
         shell.wallHit = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/wall-hit.ogg");
+        shell.cursor = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Art/UI/cursor.png");
     }
 
     static Camera BuildCamera()

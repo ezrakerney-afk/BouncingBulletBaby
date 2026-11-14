@@ -2,12 +2,31 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 // Lives across level loads: loops the soundtrack and plays the sound effects.
+// Also swaps the mouse pointer for Ezra's crosshair, drawn on the game's pixel grid.
 // Esc goes back to the home screen, or quits from there.
 public sealed class GameShell : MonoBehaviour
 {
     public AudioClip music, gunshot, wallHit;
+    public Texture2D cursor;
+    const int CursorSize = 2; // game pixels per crosshair pixel
     static AudioSource player, effects;
     static AudioClip shotClip, hitClip;
+
+    void OnEnable() { if (cursor != null) Cursor.visible = false; }
+    void OnDisable() { Cursor.visible = true; }
+
+    void OnGUI()
+    {
+        var mouse = Mouse.current;
+        if (cursor == null || mouse == null || Event.current.type != EventType.Repaint) return;
+        GUI.depth = -2000; // above everything, including the black fade
+        int pixel = PixelUI.Scale * CursorSize;
+        Vector2 p = mouse.position.ReadValue();
+        // Centre the crosshair on the pointer (its red middle pixel is the aim point), snapped to whole pixels.
+        float x = Mathf.Round(p.x - cursor.width * pixel / 2f);
+        float y = Mathf.Round(Screen.height - p.y - cursor.height * pixel / 2f);
+        GUI.DrawTexture(new Rect(x, y, cursor.width * pixel, cursor.height * pixel), cursor);
+    }
 
     void Awake()
     {
