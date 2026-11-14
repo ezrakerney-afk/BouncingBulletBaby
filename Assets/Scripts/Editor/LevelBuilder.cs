@@ -301,11 +301,14 @@ public static class LevelBuilder
             AssetDatabase.ImportAsset(path);
         }
         var imp = (TextureImporter)AssetImporter.GetAtPath(path);
-        if (imp.textureType != TextureImporterType.Sprite || imp.spritePixelsPerUnit != PixelsPerUnit
+        if (imp.textureType != TextureImporterType.Sprite || imp.spriteImportMode != SpriteImportMode.Single
+            || imp.spritePixelsPerUnit != PixelsPerUnit
             || imp.filterMode != FilterMode.Point || imp.textureCompression != TextureImporterCompression.Uncompressed
             || imp.mipmapEnabled)
         {
             imp.textureType = TextureImporterType.Sprite;
+            // Single mode: a stale Multiple-mode sheet from the old 64px texture leaves square_0 outside the 16px texture, so nothing renders.
+            imp.spriteImportMode = SpriteImportMode.Single;
             imp.spritePixelsPerUnit = PixelsPerUnit;
             imp.filterMode = FilterMode.Point;
             imp.textureCompression = TextureImporterCompression.Uncompressed;
