@@ -12,6 +12,8 @@ public sealed class GameShell : MonoBehaviour
         if (player != null || music == null) return;
         var go = new GameObject("Music");
         DontDestroyOnLoad(go);
+        // The level cameras have no AudioListener, so the music object carries the one listener for the whole game.
+        if (FindFirstObjectByType<AudioListener>() == null) go.AddComponent<AudioListener>();
         player = go.AddComponent<AudioSource>();
         player.clip = music;
         player.loop = true;
