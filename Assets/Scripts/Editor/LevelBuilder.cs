@@ -28,6 +28,10 @@ public static class LevelBuilder
     {
         public string name;
         public Vector2 baby, target, exit;
+        public int shots;
+        public Vector2[] targets;
+        public int[] bounces;
+        public bool boss;
         public List<(Vector2 center, Vector2 size)> blocks;
     }
 
@@ -38,14 +42,16 @@ public static class LevelBuilder
         var levels = Levels();
         var scenes = new List<EditorBuildSettingsScene>();
         Directory.CreateDirectory(SceneDir);
-        for (int i = 0; i < levels.Count; i++)
+        foreach (int i in new[] { 0, 1, 2, 5, 3, 4 })
         {
             string path = $"{SceneDir}/Level{i + 1:00}.unity";
             BuildScene(levels[i], path);
             scenes.Add(new EditorBuildSettingsScene(path, true));
         }
+        scenes.Sort((a, b) => string.CompareOrdinal(a.path, b.path));
         EditorBuildSettings.scenes = scenes.ToArray();
         AssetDatabase.SaveAssets();
+        EditorSceneManager.OpenScene($"{SceneDir}/Level01.unity");
         Debug.Log($"LevelBuilder: built {levels.Count} levels");
     }
 
@@ -55,15 +61,30 @@ public static class LevelBuilder
         var list = new List<Level>();
         list.Add(new Level { name = "Level01 - First Shot", baby = new Vector2(-12, -7.5f), target = new Vector2(12.5f, -7.5f), exit = new Vector2(12.5f, -2f),
             blocks = new List<(Vector2, Vector2)> { (new Vector2(0, -4f), new Vector2(1.5f, 10f)), (new Vector2(12.5f, -3.6f), new Vector2(5f, 0.6f)) } });
-        list.Add(new Level { name = "Level02 - Bank Shot", baby = new Vector2(-13, -7.5f), target = new Vector2(14.3f, 5.5f), exit = new Vector2(-12f, 4.6f),
-            blocks = new List<(Vector2, Vector2)> { (new Vector2(10f, 4f), new Vector2(1f, 8f)), (new Vector2(-12f, 3f), new Vector2(5f, 0.6f)), (new Vector2(2f, -6f), new Vector2(6f, 0.6f)) } });
-        list.Add(new Level { name = "Level03 - Low Ceiling", baby = new Vector2(-13, -7.5f), target = new Vector2(13f, -7.8f), exit = new Vector2(0f, 6.6f),
-            blocks = new List<(Vector2, Vector2)> { (new Vector2(6f, -5.5f), new Vector2(18f, 0.6f)), (new Vector2(-4f, -7f), new Vector2(1f, 3.4f)), (new Vector2(0f, 5f), new Vector2(4f, 0.6f)) } });
-        list.Add(new Level { name = "Level04 - Zigzag", baby = new Vector2(-13.5f, -7.5f), target = new Vector2(13.5f, 7f), exit = new Vector2(13.5f, -2.4f),
-            blocks = new List<(Vector2, Vector2)> { (new Vector2(-5f, -3f), new Vector2(1f, 12f)), (new Vector2(5f, 3f), new Vector2(1f, 12f)), (new Vector2(13.5f, -4f), new Vector2(4f, 0.6f)) } });
-        list.Add(new Level { name = "Level05 - The Vault", baby = new Vector2(-13f, -7.5f), target = new Vector2(0f, 4.5f), exit = new Vector2(13f, 6.6f),
-            blocks = new List<(Vector2, Vector2)> { (new Vector2(0f, 6.2f), new Vector2(6f, 0.6f)), (new Vector2(-2.7f, 4.2f), new Vector2(0.6f, 4f)), (new Vector2(2.7f, 4.2f), new Vector2(0.6f, 4f)),
-                (new Vector2(-8f, -2f), new Vector2(5f, 0.6f)), (new Vector2(13f, 5f), new Vector2(5f, 0.6f)) } });
+        // Build in priority order below; play order remains 1,2,3,4,5,boss.
+        list.Add(new Level { name = "Level02 - Bank Shot", shots = 3, baby = new Vector2(-12, -7.5f),
+            targets = new[] { new Vector2(8, -4), new Vector2(12, 3) }, bounces = new[] { 1, 1 },
+            blocks = new List<(Vector2, Vector2)> { (new Vector2(0, -2), new Vector2(2, 14)) } });
+        list.Add(new Level { name = "Level03 - Crib Climb", shots = 4, baby = new Vector2(-12, -7.5f),
+            targets = new[] { new Vector2(-5, -6.3f), new Vector2(8, 0), new Vector2(-5, 6) },
+            blocks = new List<(Vector2, Vector2)> {
+                (new Vector2(-9, -7.5f), new Vector2(10, .6f)),
+                (new Vector2(7, -1), new Vector2(12, .6f)),
+                (new Vector2(-7, 4.5f), new Vector2(12, .6f)),
+                (new Vector2(-5, -5.1f), new Vector2(3, .5f)),
+                (new Vector2(8, 1.2f), new Vector2(3, .5f)),
+                (new Vector2(-5, 7.2f), new Vector2(3, .5f)) } });
+        list.Add(new Level { name = "Level04 - Mobile", shots = 4, baby = new Vector2(-12, -7.5f),
+            targets = new[] { new Vector2(-6, 5), new Vector2(6, 5), new Vector2(-10, 0), new Vector2(10, 0) },
+            blocks = new List<(Vector2, Vector2)>() });
+        list.Add(new Level { name = "Level05 - Playpen Gauntlet", shots = 5, baby = new Vector2(-12, -7.5f),
+            targets = new[] { new Vector2(-8, 6.3f), new Vector2(12, 5), new Vector2(3, -4), new Vector2(7, -4), new Vector2(11, -4) },
+            bounces = new[] { 0, 2, 1, 1, 1 },
+            blocks = new List<(Vector2, Vector2)> { (new Vector2(-9, 4.5f), new Vector2(10, .6f)),
+                (new Vector2(0, 0), new Vector2(1, 9)) } });
+        list.Add(new Level { name = "Boss - Big Teddy", shots = 6, boss = true, baby = new Vector2(-12, -7.5f),
+            targets = new[] { new Vector2(3.8f, 0), new Vector2(-3.8f, 0), new Vector2(-4.2f, 1) },
+            bounces = new[] { 1, 0, 0 }, blocks = new List<(Vector2, Vector2)>() });
         return list;
     }
 
@@ -92,7 +113,7 @@ public static class LevelBuilder
         var col = baby.AddComponent<CapsuleCollider2D>(); col.size = new Vector2(1f, 1f); col.sharedMaterial = slick;
         var bc = baby.AddComponent<BabyController>();
         var rocket = baby.AddComponent<DiaperRocket>();
-        Set(rocket, "boostSpeed", 20f); Set(rocket, "boostDuration", 0.22f); Set(rocket, "cooldown", 0.3f);
+        Set(rocket, "boostSpeed", 20f); Set(rocket, "boostDuration", 0.4f); Set(rocket, "cooldown", 0.3f);
 
         var gun = new GameObject("Revolver"); gun.transform.SetParent(baby.transform, false);
         var barrel = Sprite("Barrel", gun.transform, new Vector2(0.55f, 0), new Vector2(0.6f, 0.18f), new Color(0.2f, 0.2f, 0.22f), square);
@@ -101,23 +122,94 @@ public static class LevelBuilder
         var rev = gun.AddComponent<Revolver>();
         Set(rev, "bulletPrefab", bulletPrefab); Set(rev, "muzzle", muzzle.transform); Set(rev, "owner", baby.transform); Set(rev, "aimCamera", cam);
 
-        // Target + exit
-        var target = Sprite("Target", null, lv.target, new Vector2(0.9f, 0.9f), TargetCol, circle);
-        target.AddComponent<CircleCollider2D>().radius = 0.5f;
-        var t = target.AddComponent<Target>(); Set(t, "baby", bc);
-        var bull = Sprite("Bullseye", target.transform, Vector2.zero, Vector2.one * 0.45f, Color.white, circle);
-        bull.transform.localScale = Vector3.one * 0.45f;
+        Set(rev, "capacity", lv.shots > 0 ? lv.shots : 6);
 
-        var exit = new GameObject("Exit"); exit.transform.position = lv.exit;
-        var flag = Sprite("Flag", exit.transform, new Vector2(0, 0.2f), new Vector2(0.9f, 1.6f), Color.gray, square);
-        var trig = exit.AddComponent<BoxCollider2D>(); trig.size = new Vector2(1.2f, 2f); trig.isTrigger = true;
-        var le = exit.AddComponent<LevelExit>(); Set(le, "flag", flag.GetComponent<SpriteRenderer>());
+        // Target + exit
+        var positions = lv.targets ?? new[] { lv.target };
+        var targetObjects = new List<GameObject>();
+        for (int j = 0; j < positions.Length; j++)
+        {
+            var target = Sprite($"Target{j + 1}", null, positions[j], Vector2.one * .9f, TargetCol, circle);
+            target.AddComponent<CircleCollider2D>().isTrigger = true;
+            var t = target.AddComponent<Target>(); Set(t, "baby", bc);
+            t.requiredBounces = lv.bounces != null ? lv.bounces[j] : 0;
+            t.requiresCeilingBounce = lv.boss && j == 0;
+            t.penetrate = lv.name.Contains("Gauntlet") && j >= 2;
+            targetObjects.Add(target);
+            var bull = Sprite("Bullseye", target.transform, Vector2.zero, Vector2.one * .45f, Color.white, circle);
+            if (lv.boss) target.AddComponent<GreyboxMotion>().phase = j + 1;
+            if (lv.name.Contains("Mobile") && j < 2)
+            {
+                var motion = target.AddComponent<GreyboxMotion>();
+                motion.amplitude = new Vector2(2.5f, .6f); motion.frequency = 1.2f; motion.offset = j * Mathf.PI;
+                Sprite("Hanger", level.transform, new Vector2(positions[j].x, 7.7f), new Vector2(.1f, 2.4f), Wood, square);
+            }
+        }
+        if (lv.name.Contains("Crib") || lv.name.Contains("Gauntlet"))
+        {
+            var pickup = Sprite("DiaperRocket Pickup (right click to boost)", null,
+                lv.name.Contains("Crib") ? new Vector2(-11, -6.4f) : new Vector2(-11, -7.5f), Vector2.one, Color.cyan, circle);
+            pickup.AddComponent<CircleCollider2D>().isTrigger = true;
+            pickup.AddComponent<RocketPickup>();
+        }
+        if (lv.name.Contains("Mobile"))
+        {
+            foreach (float x in new[] { -10f, 10f })
+            {
+                var deflector = Block(level.transform, "45 degree deflector", new Vector2(x, -2), new Vector2(3, .5f), Rock);
+                deflector.transform.rotation = Quaternion.Euler(0, 0, x < 0 ? 45 : -45);
+                Block(level.transform, "Target cover", new Vector2(x - (x < 0 ? 1.4f : -1.4f), 0), new Vector2(.5f, 2), Rock);
+            }
+        }
+        if (lv.boss) BuildTeddy(level.transform, targetObjects);
+        if (lv.name.Contains("Crib"))
+            foreach (var position in positions)
+                Block(level.transform, "Crib alcove back", position + Vector2.right * 1.5f, new Vector2(.5f, 2.4f), Rock);
+
+        // First Shot retains its rocket-to-exit tutorial; later rooms clear on all targets.
+        if (lv.targets == null)
+        {
+            var exit = new GameObject("Exit"); exit.transform.position = lv.exit;
+            var flag = Sprite("Flag", exit.transform, new Vector2(0, .2f), new Vector2(.9f, 1.6f), Color.gray, square);
+            var trig = exit.AddComponent<BoxCollider2D>(); trig.size = new Vector2(1.2f, 2); trig.isTrigger = true;
+            var le = exit.AddComponent<LevelExit>(); Set(le, "flag", flag.GetComponent<SpriteRenderer>());
+        }
 
         var mgr = new GameObject("LevelManager");
-        mgr.AddComponent<LevelManager>();
+        var manager = mgr.AddComponent<LevelManager>();
+        manager.boss = lv.boss;
+        manager.instructions = lv.name + (lv.boss ? ": ceiling bank, moving spot, shield gap; ammo refills per phase."
+            : lv.name.Contains("Bank") ? ": both targets require a wall bank."
+            : lv.name.Contains("Crib") ? ": jump onto tier 1, collect cyan rocket, boost between firing ledges."
+            : lv.name.Contains("Mobile") ? ": time swinging targets; use the angled deflectors."
+            : lv.name.Contains("Gauntlet") ? ": cyan rocket to high ledge; upper-right target needs 2 bounces; bank through the lower row."
+            : ": hit the target, then rocket to the flag.");
         mgr.AddComponent<GameplayUI>();
 
         EditorSceneManager.SaveScene(scene, path);
+    }
+
+    static void BuildTeddy(Transform parent, List<GameObject> targets)
+    {
+        var teddy = Block(parent, "Big Teddy (6x6)", Vector2.zero, new Vector2(6, 6), Wood);
+        Sprite("Left ear", teddy.transform, new Vector2(-.4f, .5f), Vector2.one * .35f, Rock, circle);
+        Sprite("Right ear", teddy.transform, new Vector2(.4f, .5f), Vector2.one * .35f, Rock, circle);
+        // Phase two motion is shared by body and exposed weak spot.
+        var movement = teddy.AddComponent<GreyboxMotion>();
+        movement.phase = 2; movement.amplitude = new Vector2(3, 0); movement.frequency = .8f;
+        // Keep a stationary body in phases one and three.
+        for (int phase = 1; phase <= 3; phase += 2)
+            Block(parent, $"Teddy phase {phase}", Vector2.zero, new Vector2(6, 6), Wood).AddComponent<GreyboxMotion>().phase = phase;
+        var spotMotion = targets[1].GetComponent<GreyboxMotion>();
+        spotMotion.amplitude = new Vector2(3, 0); spotMotion.frequency = .8f;
+        var thrown = Block(null, "Thrown block template", new Vector2(0, -30), Vector2.one, Rock);
+        thrown.AddComponent<Rigidbody2D>().gravityScale = 1;
+        thrown.SetActive(false);
+        movement.throwBlocks = true; movement.blockPrefab = thrown;
+        var shields = new GameObject("Rotating shields"); shields.transform.position = targets[2].transform.position;
+        var spin = shields.AddComponent<GreyboxMotion>(); spin.phase = 3; spin.rotationSpeed = 65;
+        Block(shields.transform, "Shield A", new Vector2(0, 1.5f), new Vector2(2, .3f), Color.gray);
+        Block(shields.transform, "Shield B", new Vector2(0, -1.5f), new Vector2(2, .3f), Color.gray);
     }
 
     static GameObject Block(Transform parent, string name, Vector2 center, Vector2 size, Color color)

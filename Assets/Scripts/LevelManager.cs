@@ -22,6 +22,11 @@ public sealed class LevelManager : MonoBehaviour
     public bool HasNextLevel => SceneManager.GetActiveScene().buildIndex >= 0 &&
         SceneManager.GetActiveScene().buildIndex + 1 < SceneManager.sceneCountInBuildSettings;
     float restartAt = -1f;
+    Target[] targets;
+    public int TargetsRemaining { get; private set; }
+    public int BossPhase { get; private set; }
+    public bool boss;
+    public string instructions;
 
     void Awake()
     {
@@ -29,6 +34,9 @@ public sealed class LevelManager : MonoBehaviour
         if (baby == null) baby = FindFirstObjectByType<BabyController>();
         if (target == null) target = FindFirstObjectByType<Target>();
         if (exit == null) exit = FindFirstObjectByType<LevelExit>();
+        targets = FindObjectsByType<Target>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var t in targets) if (t.gameObject.scene == gameObject.scene) TargetsRemaining++;
+        if (boss) BossPhase = 1;
     }
 
     void OnEnable() { Target.OnHit += HandleTargetHit; LevelExit.OnReached += HandleExit; }
@@ -37,6 +45,18 @@ public sealed class LevelManager : MonoBehaviour
     void HandleTargetHit(Target hit)
     {
         if (TargetHit || hit.gameObject.scene != gameObject.scene) return;
+        TargetsRemaining--;
+        if (TargetsRemaining > 0)
+        {
+            if (boss)
+            {
+                BossPhase++;
+                if (revolver != null) revolver.Reload();
+                restartAt = -1f;
+                OutOfShots = false;
+            }
+            return;
+        }
         TargetHit = true;
         if (baby != null) baby.UnlockRocket();
         if (revolver != null) revolver.CanShoot = false;
