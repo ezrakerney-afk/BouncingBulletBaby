@@ -4,6 +4,7 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 // Builds the greybox levels from code so nobody hand-edits .unity files.
 // Menu: Bouncing Bullet Baby > Build Greybox Levels. Batch: -executeMethod LevelBuilder.BuildAll
@@ -12,6 +13,7 @@ public static class LevelBuilder
     const string ArtDir = "Assets/Art/Placeholder";
     const string SceneDir = "Assets/Scenes/Levels";
     const string BulletPath = "Assets/Prefabs/Bullet.prefab";
+    const int PixelsPerUnit = 16;
 
     static readonly Color Sand = new Color(0.93f, 0.80f, 0.56f);
     static readonly Color Wood = new Color(0.45f, 0.28f, 0.16f);
@@ -97,12 +99,18 @@ public static class LevelBuilder
         cam.orthographic = true; cam.orthographicSize = 9.6f;
         cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = Sand;
         camGo.transform.position = new Vector3(0, 0, -10);
+        var pixelCamera = camGo.AddComponent<PixelPerfectCamera>();
+        pixelCamera.assetsPPU = PixelsPerUnit;
+        pixelCamera.refResolutionX = 544;
+        pixelCamera.refResolutionY = 320;
+        pixelCamera.gridSnapping = PixelPerfectCamera.GridSnapping.UpscaleRenderTexture;
+        Set(pixelCamera, "m_FilterMode", (int)PixelPerfectCamera.PixelPerfectFilterMode.Point);
 
         var level = new GameObject("Level");
-        Block(level.transform, "Floor", new Vector2(0, -9.5f), new Vector2(34, 1), Wood);
-        Block(level.transform, "Ceiling", new Vector2(0, 9.5f), new Vector2(34, 1), Wood);
-        Block(level.transform, "WallL", new Vector2(-16.5f, 0), new Vector2(1, 20), Wood);
-        Block(level.transform, "WallR", new Vector2(16.5f, 0), new Vector2(1, 20), Wood);
+        Block(level.transform, "Floor", new Vector2(0, -10), new Vector2(36, 2), Wood);
+        Block(level.transform, "Ceiling", new Vector2(0, 10), new Vector2(36, 2), Wood);
+        Block(level.transform, "WallL", new Vector2(-17, 0), new Vector2(2, 20), Wood);
+        Block(level.transform, "WallR", new Vector2(17, 0), new Vector2(2, 20), Wood);
         int n = 0;
         foreach (var b in lv.blocks) Block(level.transform, $"Block{++n}", b.center, b.size, Rock);
 
@@ -214,6 +222,8 @@ public static class LevelBuilder
 
     static GameObject Block(Transform parent, string name, Vector2 center, Vector2 size, Color color)
     {
+        center = new Vector2(Mathf.Round(center.x), Mathf.Round(center.y));
+        size = new Vector2(Mathf.Max(1, Mathf.Round(size.x)), Mathf.Max(1, Mathf.Round(size.y)));
         var go = Sprite(name, parent, center, size, color, square);
         go.AddComponent<BoxCollider2D>().sharedMaterial = slick;
         return go;
@@ -275,9 +285,9 @@ public static class LevelBuilder
 
     static Sprite MakeSprite(string path, bool round)
     {
-        if (!File.Exists(path))
+        // Regenerate our two owned placeholders so older 64px assets migrate too.
         {
-            const int s = 64;
+            const int s = PixelsPerUnit;
             var tex = new Texture2D(s, s, TextureFormat.RGBA32, false);
             for (int y = 0; y < s; y++)
                 for (int x = 0; x < s; x++)
@@ -287,14 +297,19 @@ public static class LevelBuilder
                     tex.SetPixel(x, y, on ? Color.white : Color.clear);
                 }
             File.WriteAllBytes(path, tex.EncodeToPNG());
+            Object.DestroyImmediate(tex);
             AssetDatabase.ImportAsset(path);
         }
         var imp = (TextureImporter)AssetImporter.GetAtPath(path);
-        if (imp.textureType != TextureImporterType.Sprite || imp.spritePixelsPerUnit != 64)
+        if (imp.textureType != TextureImporterType.Sprite || imp.spritePixelsPerUnit != PixelsPerUnit
+            || imp.filterMode != FilterMode.Point || imp.textureCompression != TextureImporterCompression.Uncompressed
+            || imp.mipmapEnabled)
         {
             imp.textureType = TextureImporterType.Sprite;
-            imp.spritePixelsPerUnit = 64;
-            imp.filterMode = FilterMode.Bilinear;
+            imp.spritePixelsPerUnit = PixelsPerUnit;
+            imp.filterMode = FilterMode.Point;
+            imp.textureCompression = TextureImporterCompression.Uncompressed;
+            imp.mipmapEnabled = false;
             imp.SaveAndReimport();
         }
         return AssetDatabase.LoadAssetAtPath<Sprite>(path);
