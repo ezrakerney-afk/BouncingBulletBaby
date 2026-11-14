@@ -13,7 +13,8 @@ public static class LevelBuilder
     const string ArtDir = "Assets/Art/Placeholder";
     const string SceneDir = "Assets/Scenes/Levels";
     const string BulletPath = "Assets/Prefabs/Bullet.prefab";
-    const int PixelsPerUnit = 16;
+    // One pixel of Ezra's art is one game pixel: 32 px per unit, 960x540 view (2x on a 1080p screen).
+    const int PixelsPerUnit = 32;
 
     static readonly Color Sand = new Color(0.93f, 0.80f, 0.56f);
     static readonly Color Wood = new Color(0.45f, 0.28f, 0.16f);
@@ -101,16 +102,17 @@ public static class LevelBuilder
         camGo.transform.position = new Vector3(0, 0, -10);
         var pixelCamera = camGo.AddComponent<PixelPerfectCamera>();
         pixelCamera.assetsPPU = PixelsPerUnit;
-        pixelCamera.refResolutionX = 544;
-        pixelCamera.refResolutionY = 320;
+        pixelCamera.refResolutionX = 960;
+        pixelCamera.refResolutionY = 540;
         pixelCamera.gridSnapping = PixelPerfectCamera.GridSnapping.UpscaleRenderTexture;
         Set(pixelCamera, "m_FilterMode", (int)PixelPerfectCamera.PixelPerfectFilterMode.Point);
 
         var level = new GameObject("Level");
-        Block(level.transform, "Floor", new Vector2(0, -10), new Vector2(36, 2), Wood);
-        Block(level.transform, "Ceiling", new Vector2(0, 10), new Vector2(36, 2), Wood);
-        Block(level.transform, "WallL", new Vector2(-17, 0), new Vector2(2, 20), Wood);
-        Block(level.transform, "WallR", new Vector2(17, 0), new Vector2(2, 20), Wood);
+        // Room interior is 28x16 units so the walls stay inside the 30x16.9 unit view.
+        Block(level.transform, "Floor", new Vector2(0, -9), new Vector2(34, 2), Wood);
+        Block(level.transform, "Ceiling", new Vector2(0, 9), new Vector2(34, 2), Wood);
+        Block(level.transform, "WallL", new Vector2(-15, 0), new Vector2(2, 20), Wood);
+        Block(level.transform, "WallR", new Vector2(15, 0), new Vector2(2, 20), Wood);
         int n = 0;
         foreach (var b in lv.blocks) Block(level.transform, $"Block{++n}", b.center, b.size, Rock);
 
@@ -122,20 +124,34 @@ public static class LevelBuilder
             var bg = Sprite("Background", null, Vector2.zero, Vector2.one, Color.white, backgroundArt);
             bg.GetComponent<SpriteRenderer>().sortingOrder = -100;
         }
-        var babyArt = Art("baby");
-        var baby = Sprite("Baby", null, lv.baby, Vector2.one, babyArt != null ? Color.white : BabyCol, babyArt != null ? babyArt : square);
+        var babyFrames = BabyFrames();
+        bool hasBabyArt = babyFrames != null;
+        var baby = Sprite("Baby", null, lv.baby + Vector2.up * 0.5f, Vector2.one, hasBabyArt ? Color.white : BabyCol, hasBabyArt ? babyFrames[0] : square);
         baby.GetComponent<SpriteRenderer>().sortingOrder = 10;
         var rb = baby.AddComponent<Rigidbody2D>(); rb.gravityScale = 3f; rb.interpolation = RigidbodyInterpolation2D.Interpolate;
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-        var col = baby.AddComponent<CapsuleCollider2D>(); col.size = new Vector2(1f, 1f); col.sharedMaterial = slick;
+        var col = baby.AddComponent<CapsuleCollider2D>(); col.sharedMaterial = slick;
+        // The art is a 64x64 px frame (2x2 units) with the feet on its bottom edge; the body is about 0.9 x 1.65 units.
+        if (hasBabyArt) { col.size = new Vector2(0.9f, 1.65f); col.offset = new Vector2(0, -0.175f); }
+        else col.size = new Vector2(1f, 1f);
         var bc = baby.AddComponent<BabyController>();
         var rocket = baby.AddComponent<DiaperRocket>();
         Set(rocket, "boostSpeed", 20f); Set(rocket, "boostDuration", 0.4f); Set(rocket, "cooldown", 0.3f);
 
         var gun = new GameObject("Revolver"); gun.transform.SetParent(baby.transform, false);
-        var barrel = Sprite("Barrel", gun.transform, new Vector2(0.55f, 0), new Vector2(0.6f, 0.18f), new Color(0.2f, 0.2f, 0.22f), square);
-        barrel.GetComponent<SpriteRenderer>().sortingOrder = 11;
-        var muzzle = new GameObject("Muzzle"); muzzle.transform.SetParent(gun.transform, false); muzzle.transform.localPosition = new Vector3(1.0f, 0, 0);
+        if (hasBabyArt)
+        {
+            // The gun is drawn into the baby frames, so the frame follows the aim instead of a rotating barrel.
+            var aim = baby.AddComponent<BabyAimSprite>();
+            aim.body = baby.GetComponent<SpriteRenderer>(); aim.gun = gun.transform;
+            aim.frames = babyFrames; aim.angles = new float[] { 0, 20, 30, 40, 55, 70, 85, 90 };
+        }
+        else
+        {
+            var barrel = Sprite("Barrel", gun.transform, new Vector2(0.55f, 0), new Vector2(0.6f, 0.18f), new Color(0.2f, 0.2f, 0.22f), square);
+            barrel.GetComponent<SpriteRenderer>().sortingOrder = 11;
+        }
+        var muzzle = new GameObject("Muzzle"); muzzle.transform.SetParent(gun.transform, false); muzzle.transform.localPosition = new Vector3(hasBabyArt ? 1.25f : 1.0f, 0, 0);
         var rev = gun.AddComponent<Revolver>();
         Set(rev, "bulletPrefab", bulletPrefab); Set(rev, "muzzle", muzzle.transform); Set(rev, "owner", baby.transform); Set(rev, "aimCamera", cam);
 
@@ -146,14 +162,15 @@ public static class LevelBuilder
         var targetObjects = new List<GameObject>();
         for (int j = 0; j < positions.Length; j++)
         {
-            var target = Sprite($"Target{j + 1}", null, positions[j], Vector2.one * .9f, TargetCol, circle);
+            var targetArt = Art("target");
+            var target = Sprite($"Target{j + 1}", null, positions[j], targetArt != null ? Vector2.one : Vector2.one * .9f, targetArt != null ? Color.white : TargetCol, targetArt != null ? targetArt : circle);
             target.AddComponent<CircleCollider2D>().isTrigger = true;
             var t = target.AddComponent<Target>(); Set(t, "baby", bc);
             t.requiredBounces = lv.bounces != null ? lv.bounces[j] : 0;
             t.requiresCeilingBounce = lv.boss && j == 0;
             t.penetrate = lv.name.Contains("Gauntlet") && j >= 2;
             targetObjects.Add(target);
-            var bull = Sprite("Bullseye", target.transform, Vector2.zero, Vector2.one * .45f, Color.white, circle);
+            if (targetArt == null) Sprite("Bullseye", target.transform, Vector2.zero, Vector2.one * .45f, Color.white, circle);
             if (lv.boss) target.AddComponent<GreyboxMotion>().phase = j + 1;
             if (lv.name.Contains("Mobile") && j < 2)
             {
@@ -202,6 +219,8 @@ public static class LevelBuilder
             : lv.name.Contains("Gauntlet") ? ": cyan rocket to high ledge; upper-right target needs 2 bounces; bank through the lower row."
             : ": hit the target, then rocket to the flag.");
         mgr.AddComponent<GameplayUI>();
+        var shell = mgr.AddComponent<GameShell>();
+        shell.music = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/soundtrack.ogg");
 
         EditorSceneManager.SaveScene(scene, path);
     }
@@ -253,6 +272,18 @@ public static class LevelBuilder
     const float Pixel = 1f / PixelsPerUnit;
     static float Snap(float v) => Mathf.Round(v * PixelsPerUnit) / PixelsPerUnit;
     static Sprite Art(string name) => AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Art/{name}.png");
+
+    // Assets/Art/Baby/baby_aim0.png (gun level) up to baby_aim7.png (gun straight up). Null until all eight exist.
+    static Sprite[] BabyFrames()
+    {
+        var frames = new Sprite[8];
+        for (int i = 0; i < frames.Length; i++)
+        {
+            frames[i] = Art($"Baby/baby_aim{i}");
+            if (frames[i] == null) return null;
+        }
+        return frames;
+    }
 
     static void Set(Object obj, string field, object value)
     {

@@ -2,7 +2,7 @@
 using UnityEditor;
 using UnityEngine;
 
-// Any image dropped under Assets/Art imports as crisp pixel art: 16 px per unit, no smoothing, no compression.
+// Any image dropped under Assets/Art imports as crisp pixel art: 32 px per unit, no smoothing, no compression.
 public sealed class PixelArtImporter : AssetPostprocessor
 {
     void OnPreprocessTexture()
@@ -15,7 +15,7 @@ public sealed class PixelArtImporter : AssetPostprocessor
             imp.textureType = TextureImporterType.Sprite;
             imp.spriteImportMode = SpriteImportMode.Single;
         }
-        imp.spritePixelsPerUnit = 16;
+        imp.spritePixelsPerUnit = 32;
         imp.filterMode = FilterMode.Point;
         imp.textureCompression = TextureImporterCompression.Uncompressed;
         imp.mipmapEnabled = false;
