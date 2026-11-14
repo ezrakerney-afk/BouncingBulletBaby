@@ -24,7 +24,7 @@ public sealed class GameplayUI : MonoBehaviour
         originY = (Screen.height - RefHeight * scale) / 2;
 
         Line(8, 4, $"LEVEL {level.LevelNumber}  {level.title}  BULLETS: {level.ShotsLeft}  TARGETS: {level.TargetsRemaining}", 2);
-        Line(8, 18, "A/D MOVE  SPACE JUMP  LEFT CLICK SHOOT  R RESTART  ESC QUIT", 2);
+        Line(8, 18, "AIM WITH THE MOUSE  LEFT CLICK SHOOT  R RESTART  ESC QUIT", 2);
 
         string center = null;
         if (level.LevelComplete) center = level.HasNextLevel ? "BULLSEYE!" : "YOU BEAT IT!  THANKS FOR PLAYING";

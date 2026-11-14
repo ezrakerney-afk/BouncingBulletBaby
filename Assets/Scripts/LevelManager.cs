@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
-// Level flow: hit every target (ricochets allowed) and the next level loads by itself.
+// Level flow: hit every target (ricochets allowed) and the screen fades to black into the next level.
 // Out of shots with a target still up restarts the level.
 public sealed class LevelManager : MonoBehaviour
 {
@@ -10,8 +10,8 @@ public sealed class LevelManager : MonoBehaviour
     [SerializeField] BabyController baby;
     [SerializeField] bool restartWhenOutOfShots = true;
     [SerializeField] float restartDelay = 0.8f;
-    [SerializeField] float nextLevelDelay = 0.9f;
-    [SerializeField] float endScreenDelay = 4f;
+    [SerializeField] float nextLevelDelay = 0.4f;
+    [SerializeField] float endScreenDelay = 3f;
     [SerializeField] float killY = -15f;
 
     public bool LevelComplete { get; private set; }
@@ -49,13 +49,15 @@ public sealed class LevelManager : MonoBehaviour
     void Update()
     {
         var keyboard = Keyboard.current;
+        if (ScreenFade.Busy) return;
         if (keyboard != null && keyboard.rKey.wasPressedThisFrame) { RestartLevel(); return; }
 
         if (LevelComplete)
         {
-            if (Time.time >= nextAt)
+            if (Time.time >= nextAt && !ScreenFade.Busy)
             {
-                if (HasNextLevel) LoadNextLevel(); else LoadFirstLevel();
+                nextAt = float.PositiveInfinity;
+                ScreenFade.LoadScene(HasNextLevel ? SceneManager.GetActiveScene().buildIndex + 1 : 0);
             }
             return;
         }
@@ -72,6 +74,4 @@ public sealed class LevelManager : MonoBehaviour
     }
 
     public void RestartLevel() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-    public void LoadNextLevel() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
-    public void LoadFirstLevel() => SceneManager.LoadScene(0);
 }

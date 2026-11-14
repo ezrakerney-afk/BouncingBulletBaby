@@ -87,7 +87,7 @@ def shoot(solid, targets, ox, oy, ang):
 
 def analyse(name, shots, text, verbose=True):
     rows, solid, baby, targets = parse(text)
-    cells = standing_cells(solid, baby)
+    cells = {baby}  # the baby never moves: every shot is fired from the start tile
     best = {}  # target -> (bounces, window_deg, x, y, angle)
     STEP = 0.25
     for (cx, cy) in sorted(cells):
@@ -119,7 +119,37 @@ def analyse(name, shots, text, verbose=True):
             else: print(f"   target at col {t[0]} row {t[1]}: no reliable shot found")
     return ok, best
 
+def bounce_map(text, min_window=1.5, step=0.125):
+    """Design aid: for every empty tile, the fewest bounces that reach it through an aiming
+    window at least min_window degrees wide ('.' = cannot be hit that reliably)."""
+    rows, solid, baby, _ = parse(text)
+    cells = [(x, y) for y in range(H) for x in range(W) if not solid[y][x] and (x, y) != baby]
+    ox, oy = baby[0] + 0.5, baby[1]
+    best = {}; run = {}
+    a = -30.0
+    while a <= 210.0:
+        h = shoot(solid, cells, ox, oy, a)
+        for i, b in h.items():
+            k = (i, b); st = run.get(k)
+            run[k] = (st[0], a) if st and abs(st[1] - (a - step)) < 1e-9 else (a, a)
+            if run[k][1] - run[k][0] + step >= min_window and (i not in best or b < best[i]): best[i] = b
+        a += step
+    out = []
+    for y in range(H):
+        line = ""
+        for x in range(W):
+            if solid[y][x]: line += "#"
+            elif (x, y) == baby: line += "B"
+            else:
+                b = best.get(cells.index((x, y)))
+                line += "." if b is None else (str(b) if b < 10 else "+")
+        out.append(line)
+    return "\n".join(out)
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "map":
+        for name, shots, text in LEVELS: print(name); print(bounce_map(text)); print()
+        sys.exit(0)
     allok = True
     for name, shots, text in LEVELS:
         ok, _ = analyse(name, shots, text); allok &= ok

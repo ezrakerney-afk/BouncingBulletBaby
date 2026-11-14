@@ -17,7 +17,8 @@ public static class LevelBuilder
     const int PixelsPerUnit = 32;
 
     static readonly Color Sand = new Color(0.93f, 0.80f, 0.56f);
-    static readonly Color Wood = new Color(0.45f, 0.28f, 0.16f);
+    // Every surface is sand colored until the real tiles arrive; a touch deeper than the background sand so walls read.
+    static readonly Color WallSand = new Color(0.90f, 0.75f, 0.50f);
     static readonly Color BabyCol = new Color(1f, 0.85f, 0.75f);
     static readonly Color TargetCol = new Color(0.9f, 0.12f, 0.12f);
 
@@ -36,7 +37,7 @@ public static class LevelBuilder
         public string name;
         public int shots;
         public bool[,] solid;      // [col, row]
-        public Vector2 baby;       // centre of the tile the baby's feet stand in
+        public Vector2 baby;       // centre of the tile the baby's feet stand in (same tile in every level)
         public List<Vector2> targets;
     }
 
@@ -115,9 +116,8 @@ public static class LevelBuilder
         pixelCamera.gridSnapping = PixelPerfectCamera.GridSnapping.UpscaleRenderTexture;
         Set(pixelCamera, "m_FilterMode", (int)PixelPerfectCamera.PixelPerfectFilterMode.Point);
 
-        // Background: Assets/Art/background.png for the first half of the game, background2.png after.
-        var backgroundArt = index >= 3 ? Art("background2") : null;
-        if (backgroundArt == null) backgroundArt = Art("background");
+        // Background: Assets/Art/background.png sits behind everything in every level.
+        var backgroundArt = Art("background");
         if (backgroundArt != null)
         {
             var bg = Sprite("Background", null, Vector2.zero, Vector2.one, Color.white, backgroundArt);
@@ -132,12 +132,7 @@ public static class LevelBuilder
         // The baby sprite is 2x2 units with the feet on its bottom edge, so its centre is half a unit above the feet tile's centre.
         var baby = Sprite("Baby", null, lv.baby + Vector2.up * 0.5f, Vector2.one, hasBabyArt ? Color.white : BabyCol, hasBabyArt ? babyFrames[0] : square);
         baby.GetComponent<SpriteRenderer>().sortingOrder = 10;
-        var rb = baby.AddComponent<Rigidbody2D>(); rb.gravityScale = 3f; rb.interpolation = RigidbodyInterpolation2D.Interpolate;
-        rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-        var col = baby.AddComponent<CapsuleCollider2D>(); col.sharedMaterial = slick;
-        if (hasBabyArt) { col.size = new Vector2(0.9f, 1.65f); col.offset = new Vector2(0, -0.175f); }
-        else { col.size = new Vector2(0.9f, 1f); col.offset = new Vector2(0, -0.5f); }
-        baby.AddComponent<BabyController>();
+        // The baby stands in the same spot all game and never moves, so it needs no physics.
 
         var gun = new GameObject("Revolver"); gun.transform.SetParent(baby.transform, false);
         if (hasBabyArt)
@@ -192,7 +187,7 @@ public static class LevelBuilder
             {
                 if (!lv.solid[col, row]) continue;
                 var t = Sprite($"Tile {col},{row}", walls.transform, Cell(col, row), Vector2.one,
-                    tileArt != null ? Color.white : Wood, tileArt != null ? tileArt : tile);
+                    tileArt != null ? Color.white : WallSand, tileArt != null ? tileArt : tile);
                 t.GetComponent<SpriteRenderer>().sortingOrder = 1;
             }
 
